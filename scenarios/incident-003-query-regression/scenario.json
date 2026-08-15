@@ -1,0 +1,28 @@
+{
+  "id": "incident-003-query-regression",
+  "title": "Slow Queries Post Deployment",
+  "description": "Database queries taking significantly longer after v2.1 deployment, request queues filling up",
+  "service": "checkout-service",
+  "severity": "SEV_2",
+  "fault": {
+    "type": "query_regression",
+    "deployment_version": "v2.1",
+    "request_rate": 1800,
+    "query_cost_ms": 60.0
+  },
+  "initial_telemetry": {
+    "request_rate": 1800,
+    "p95_latency": 580,
+    "error_rate": 0.06,
+    "db_utilization": 0.85,
+    "cpu": 0.65,
+    "cache_hit_rate": 0.94
+  },
+  "recent_events": [
+    "Deployment v2.1 rolled out 30 minutes ago",
+    "New product catalog query added in v2.1",
+    "No cache configuration changes"
+  ],
+  "expected_root_cause": "Unoptimized query introduced in deployment v2.1",
+  "ambiguity_note": "High DB utilization could be confused with connection pool issues or cache degradation"
+}

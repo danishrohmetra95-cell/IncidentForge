@@ -1,0 +1,26 @@
+{
+  "id": "incident-002-cache-stampede",
+  "title": "Redis Cluster Degradation",
+  "description": "Cache hit rate plummeted, database load spiking, latency increasing across checkout flow",
+  "service": "checkout-service",
+  "severity": "SEV_2",
+  "fault": {
+    "type": "cache_stampede",
+    "request_rate": 1800,
+    "initial_cache_hit_rate": 0.15
+  },
+  "initial_telemetry": {
+    "request_rate": 1800,
+    "p95_latency": 450,
+    "error_rate": 0.05,
+    "db_utilization": 0.88,
+    "cpu": 0.82,
+    "cache_hit_rate": 0.15
+  },
+  "recent_events": [
+    "Redis cluster maintenance completed 15 minutes ago",
+    "Cache invalidation job ran at 14:30"
+  ],
+  "expected_root_cause": "Cache stampede due to mass invalidation causing thundering herd to database",
+  "ambiguity_note": "DB utilization and CPU are both elevated, making query regression plausible"
+}

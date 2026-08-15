@@ -1,0 +1,31 @@
+{
+  "id": "incident-001-db-pool",
+  "title": "Checkout API Degradation",
+  "description": "P95 latency spiking to 842ms, error rate at 21%, multiple metrics showing stress across the checkout service",
+  "service": "checkout-service",
+  "severity": "SEV_1",
+  "fault": {
+    "type": "connection_leak",
+    "deployment_version": "v1.8",
+    "leak_rate": 3,
+    "request_rate": 1800,
+    "initial_cache_degradation": 0.15,
+    "cpu_overhead": 0.08
+  },
+  "initial_telemetry": {
+    "request_rate": 1800,
+    "p95_latency": 842,
+    "error_rate": 0.214,
+    "db_utilization": 0.96,
+    "cpu": 0.78,
+    "cache_hit_rate": 0.72
+  },
+  "recent_events": [
+    "Deployment v1.8 rolled out 45 minutes ago",
+    "Redis cache eviction spike observed 20 minutes ago",
+    "Checkout service CPU alert triggered 10 minutes ago",
+    "PagerDuty incident created by on-call engineer"
+  ],
+  "expected_root_cause": "DB connection pool exhaustion due to connection lifecycle regression in v1.8",
+  "ambiguity_note": "Initial telemetry shows elevated CPU and degraded cache hit rate alongside DB pressure, making cache stampede and query regression plausible alternatives"
+}
