@@ -1,0 +1,661 @@
+"""Investigation orchestrator.
+
+The central coordination loop that drives an incident investigation
+through the complete lifecycle. Agents are invoked at each phase;
+deterministic software controls state transitions, simulation,
+verification, and confidence scoring.
+
+LLMs propose. Deterministic software verifies.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import traceback
+from datetime import datetime
+from typing import Any, Callable, Coroutine
+
+from packages.contracts.domain import (
+    AgentRun,
+    Critique,
+    Evidence,
+    Experiment,
+    Hypothesis,
+    HypothesisStatus,
+    Incident,
+    IncidentMemoryRecord,
+    InvestigationState,
+    MetricExpectation,
+    Observation,
+    Remediation,
+    RemediationType,
+    TelemetrySnapshot,
+    TimelineEvent,
+    VerificationOutcome,
+    VerificationResult,
+    now,
+    new_id,
+)
+from packages.contracts.events import (
+    InvestigationEvent,
+    incident_created,
+    triage_started,
+    triage_completed,
+    evidence_found,
+    hypothesis_created,
+    hypothesis_updated,
+    critic_started,
+    critic_completed,
+    experiment_proposed,
+    experiment_validated,
+    experiment_started,
+    experiment_completed,
+    belief_updated,
+    remediation_generated,
+    remediation_validated,
+    incident_resolved,
+    investigation_failed,
+)
+from packages.contracts.agent_io import (
+    TriageInput,
+    TriageOutput,
+    EvidenceAnalysisInput,
+    EvidenceAnalysisOutput,
+    HypothesisGenerationInput,
+    HypothesisGenerationOutput,
+    CritiqueInput,
+    CritiqueOutput,
+    ExperimentDesignInput,
+    ExperimentDesignOutput,
+    RemediationInput,
+    RemediationOutput,
+)
+from packages.orchestration.state_machine import InvestigationStateMachine
+
+logger = logging.getLogger("incidentforge.orchestrator")
+
+# Maximum retry cycles when hypothesis is rejected or inconclusive
+MAX_HYPOTHESIS_CYCLES = 3
+
+
+class InvestigationContext:
+    """Mutable context accumulating artifacts during an investigation."""
+
+    def __init__(self, incident: Incident):
+        self.incident = incident
+        self.state_machine = InvestigationStateMachine()
+        self.triage: TriageOutput | None = None
+        self.evidence: list[Evidence] = []
+        self.hypotheses: list[Hypothesis] = []
+        self.critiques: list[Critique] = []
+        self.experiments: list[Experiment] = []
+        self.observations: list[Observation] = []
+        self.verifications: list[VerificationResult] = []
+        self.remediation: Remediation | None = None
+        self.timeline: list[TimelineEvent] = []
+        self.agent_runs: list[AgentRun] = []
+        self.hypothesis_cycles = 0
+
+
+# Type for event listener callbacks
+EventListener = Callable[[InvestigationEvent], Coroutine[Any, Any, None]]
+
+
+class InvestigationOrchestrator:
+    """Drives the complete investigation lifecycle.
+
+    This is the coordination layer — it invokes agents, feeds their outputs
+    to deterministic engines, and controls state transitions. The orchestrator
+    does NOT perform reasoning; it delegates to agents (AI) and engines
+    (deterministic software).
+    """
+
+    def __init__(
+        self,
+        # Agents
+        triage_agent: Any,
+        evidence_analyst: Any,
+        hypothesis_engine: Any,
+        adversarial_critic: Any,
+        experiment_designer: Any,
+        remediation_agent: Any,
+        # Deterministic engines
+        experiment_engine: Any,
+        verification_engine: Any,
+        belief_engine: Any,
+        safety_validator: Any,
+        # Digital Twin
+        twin_factory: Any,      # callable returning configured DigitalTwin
+        # Memory
+        memory_store: Any | None = None,
+        fingerprinter: Any | None = None,
+        # Event system
+        event_listeners: list[EventListener] | None = None,
+    ):
+        self._triage = triage_agent
+        self._evidence = evidence_analyst
+        self._hypothesis = hypothesis_engine
+        self._critic = adversarial_critic
+        self._experiment_designer = experiment_designer
+        self._remediation = remediation_agent
+        self._experiment_engine = experiment_engine
+        self._verification = verification_engine
+        self._belief = belief_engine
+        self._safety = safety_validator
+        self._twin_factory = twin_factory
+        self._memory = memory_store
+        self._fingerprinter = fingerprinter
+        self._listeners: list[EventListener] = event_listeners or []
+
+    def add_listener(self, listener: EventListener) -> None:
+        self._listeners.append(listener)
+
+    async def _emit(self, event: InvestigationEvent) -> None:
+        for listener in self._listeners:
+            try:
+                await listener(event)
+            except Exception:
+                logger.warning("Event listener error", exc_info=True)
+
+    def _timeline(self, ctx: InvestigationContext, event_type: str,
+                  title: str, description: str = "", **data: Any) -> None:
+        entry = TimelineEvent(
+            incident_id=ctx.incident.id,
+            event_type=event_type,
+            title=title,
+            description=description,
+            data=data,
+            state=ctx.state_machine.state,
+        )
+        ctx.timeline.append(entry)
+
+    async def run(self, incident: Incident, scenario_data: dict | None = None) -> InvestigationContext:
+        """Execute the complete investigation lifecycle."""
+        ctx = InvestigationContext(incident)
+        scenario = scenario_data or {}
+
+        try:
+            await self._emit(incident_created(incident.id, title=incident.title))
+            self._timeline(ctx, "incident.created", "Incident created",
+                           incident.title)
+
+            # ── INGEST ──────────────────────────────────────────────
+            ctx.state_machine.transition(InvestigationState.INGESTING)
+            ctx.incident.status = InvestigationState.INGESTING
+            self._timeline(ctx, "phase.started", "Ingesting incident data")
+
+            # ── TRIAGE ──────────────────────────────────────────────
+            ctx.state_machine.transition(InvestigationState.TRIAGING)
+            ctx.incident.status = InvestigationState.TRIAGING
+            await self._emit(triage_started(incident.id))
+
+            triage_input = TriageInput(
+                incident_title=incident.title,
+                incident_description=incident.description,
+                service=incident.service,
+                initial_telemetry=scenario.get("initial_telemetry", {}),
+                recent_events=scenario.get("recent_events", []),
+            )
+            ctx.triage = await self._triage.analyze(triage_input)
+            ctx.incident.symptoms = ctx.triage.symptoms
+            if ctx.triage.estimated_severity:
+                ctx.incident.severity = ctx.triage.estimated_severity
+
+            await self._emit(triage_completed(
+                incident.id, summary=ctx.triage.summary
+            ))
+            self._timeline(ctx, "triage.completed", "Triage complete",
+                           ctx.triage.summary)
+
+            # ── EVIDENCE COLLECTION ─────────────────────────────────
+            ctx.state_machine.transition(InvestigationState.EVIDENCE_COLLECTION)
+            ctx.incident.status = InvestigationState.EVIDENCE_COLLECTION
+
+            # Fetch similar historical incidents for context
+            historical = []
+            if self._memory and self._fingerprinter:
+                fp = self._fingerprinter.fingerprint(
+                    ctx.incident, ctx.triage.symptoms, []
+                )
+                similar = await self._memory.find_similar(fp, limit=3)
+                historical = [
+                    f"INC-{s.incident_id[:8]}: {s.root_cause}" for s in similar
+                ]
+
+            evidence_input = EvidenceAnalysisInput(
+                incident_id=incident.id,
+                triage_summary=ctx.triage.summary,
+                symptoms=ctx.triage.symptoms,
+                scenario_data=scenario,
+                historical_incidents=historical,
+            )
+            evidence_output = await self._evidence.analyze(evidence_input)
+
+            for item in evidence_output.evidence:
+                ev = Evidence(
+                    incident_id=incident.id,
+                    type=item.type,
+                    source=item.source,
+                    observation=item.observation,
+                    strength=item.strength,
+                )
+                ctx.evidence.append(ev)
+                await self._emit(evidence_found(
+                    incident.id, ev.id, ev.observation[:100]
+                ))
+
+            self._timeline(ctx, "evidence.collected",
+                           f"Collected {len(ctx.evidence)} evidence items")
+
+            # ── HYPOTHESIS-EXPERIMENT CYCLE ─────────────────────────
+            # This loop supports re-hypothesizing on rejection
+            while ctx.hypothesis_cycles < MAX_HYPOTHESIS_CYCLES:
+                ctx.hypothesis_cycles += 1
+
+                # ── HYPOTHESIS GENERATION ───────────────────────────
+                ctx.state_machine.transition(InvestigationState.HYPOTHESIS_GENERATION)
+                ctx.incident.status = InvestigationState.HYPOTHESIS_GENERATION
+
+                hyp_input = HypothesisGenerationInput(
+                    incident_id=incident.id,
+                    triage_summary=ctx.triage.summary,
+                    symptoms=ctx.triage.symptoms,
+                    evidence=ctx.evidence,
+                )
+                hyp_output = await self._hypothesis.generate(hyp_input)
+
+                ctx.hypotheses = []
+                for candidate in hyp_output.hypotheses:
+                    h = Hypothesis(
+                        incident_id=incident.id,
+                        statement=candidate.statement,
+                        score=candidate.initial_score,
+                        predictions=candidate.predictions,
+                    )
+                    # Link evidence
+                    for idx in candidate.supporting_evidence_indices:
+                        if idx < len(ctx.evidence):
+                            h.supporting_evidence.append(ctx.evidence[idx].id)
+                    for idx in candidate.contradicting_evidence_indices:
+                        if idx < len(ctx.evidence):
+                            h.contradicting_evidence.append(ctx.evidence[idx].id)
+
+                    ctx.hypotheses.append(h)
+                    await self._emit(hypothesis_created(
+                        incident.id, h.id, h.statement, h.score
+                    ))
+
+                self._timeline(ctx, "hypotheses.generated",
+                               f"Generated {len(ctx.hypotheses)} hypotheses")
+
+                if not ctx.hypotheses:
+                    await self._fail(ctx, "No hypotheses generated")
+                    return ctx
+
+                # ── ADVERSARIAL CRITIQUE ────────────────────────────
+                ctx.state_machine.transition(InvestigationState.HYPOTHESIS_CRITIQUE)
+                ctx.incident.status = InvestigationState.HYPOTHESIS_CRITIQUE
+                await self._emit(critic_started(incident.id))
+
+                leading = max(ctx.hypotheses, key=lambda h: h.score)
+                leading.status = HypothesisStatus.TESTING
+
+                critique_input = CritiqueInput(
+                    incident_id=incident.id,
+                    leading_hypothesis=leading,
+                    all_hypotheses=ctx.hypotheses,
+                    evidence=ctx.evidence,
+                )
+                critique_output = await self._critic.critique(critique_input)
+                critique = Critique(
+                    hypothesis_id=leading.id,
+                    objections=critique_output.objections,
+                    assumptions=critique_output.assumptions_identified,
+                    evidence_weaknesses=critique_output.evidence_weaknesses,
+                    contradictions=critique_output.contradictions,
+                    alternatives=critique_output.alternative_explanations,
+                    falsification_criteria=critique_output.falsification_criteria,
+                    recommended_experiment=critique_output.recommended_experiment_description,
+                )
+                ctx.critiques.append(critique)
+
+                await self._emit(critic_completed(
+                    incident.id,
+                    objections=critique.objections,
+                    alternatives=critique.alternatives,
+                    recommended_experiment=critique.recommended_experiment,
+                ))
+                self._timeline(ctx, "critic.completed",
+                               "Adversarial critique complete",
+                               critique.objections[0] if critique.objections else "")
+
+                # ── EXPERIMENT DESIGN ───────────────────────────────
+                ctx.state_machine.transition(InvestigationState.EXPERIMENT_DESIGN)
+                ctx.incident.status = InvestigationState.EXPERIMENT_DESIGN
+
+                # Get available interventions from the experiment engine's registry
+                available = self._experiment_engine.available_interventions()
+
+                design_input = ExperimentDesignInput(
+                    incident_id=incident.id,
+                    target_hypothesis=leading,
+                    critique=critique_output,
+                    available_interventions=available,
+                    current_telemetry=scenario.get("initial_telemetry", {}),
+                )
+                design_output = await self._experiment_designer.design(design_input)
+
+                experiment = Experiment(
+                    incident_id=incident.id,
+                    target_hypothesis=leading.id,
+                    intervention=design_output.intervention,
+                    controls=design_output.controls,
+                    expected_conditions=design_output.expected_conditions,
+                    observation_window_seconds=design_output.observation_window_seconds,
+                    failure_conditions=design_output.failure_conditions,
+                )
+                ctx.experiments.append(experiment)
+
+                await self._emit(experiment_proposed(
+                    incident.id, experiment.id,
+                    experiment.intervention.type,
+                ))
+                self._timeline(ctx, "experiment.designed",
+                               f"Experiment: {experiment.intervention.type}",
+                               design_output.rationale)
+
+                # ── EXPERIMENT VALIDATION ───────────────────────────
+                ctx.state_machine.transition(InvestigationState.EXPERIMENT_VALIDATION)
+                ctx.incident.status = InvestigationState.EXPERIMENT_VALIDATION
+
+                approved, reasons = self._safety.validate(experiment)
+                experiment.status = "validated" if approved else "rejected"
+
+                await self._emit(experiment_validated(
+                    incident.id, experiment.id, approved,
+                    "; ".join(reasons) if reasons else "",
+                ))
+
+                if not approved:
+                    self._timeline(ctx, "experiment.rejected",
+                                   "Experiment rejected by safety validator",
+                                   "; ".join(reasons))
+                    # Try redesign by going back to experiment design
+                    ctx.state_machine.transition(InvestigationState.EXPERIMENT_DESIGN)
+                    continue
+
+                # ── EXPERIMENT EXECUTION ────────────────────────────
+                ctx.state_machine.transition(InvestigationState.EXPERIMENT_EXECUTION)
+                ctx.incident.status = InvestigationState.EXPERIMENT_EXECUTION
+                await self._emit(experiment_started(incident.id, experiment.id))
+
+                twin = self._twin_factory(scenario)
+                observation, verification = self._experiment_engine.run(
+                    experiment, twin
+                )
+                experiment.status = "completed"
+
+                ctx.observations.append(observation)
+                ctx.verifications.append(verification)
+
+                experiment.baseline = {
+                    "p95_latency": observation.baseline.p95_latency,
+                    "error_rate": observation.baseline.error_rate,
+                    "db_utilization": observation.baseline.db_utilization,
+                    "cpu": observation.baseline.cpu,
+                    "cache_hit_rate": observation.baseline.cache_hit_rate,
+                }
+
+                await self._emit(experiment_completed(
+                    incident.id, experiment.id,
+                    outcome=verification.outcome.value,
+                    baseline_p95=observation.baseline.p95_latency,
+                    post_p95=observation.post_intervention.p95_latency,
+                ))
+                self._timeline(ctx, "experiment.completed",
+                               f"Result: {verification.outcome.value}",
+                               verification.explanation)
+
+                # ── OBSERVATION ─────────────────────────────────────
+                ctx.state_machine.transition(InvestigationState.OBSERVATION)
+                ctx.incident.status = InvestigationState.OBSERVATION
+                self._timeline(ctx, "observation.recorded",
+                               "Observation recorded")
+
+                # ── BELIEF UPDATE ───────────────────────────────────
+                ctx.state_machine.transition(InvestigationState.BELIEF_UPDATE)
+                ctx.incident.status = InvestigationState.BELIEF_UPDATE
+
+                updated_scores = self._belief.update(
+                    ctx.hypotheses, ctx.verifications, ctx.evidence, ctx.experiments
+                )
+
+                for h in ctx.hypotheses:
+                    if h.id in updated_scores:
+                        old_score = h.score
+                        h.score = updated_scores[h.id]
+
+                        if h.id == leading.id:
+                            if verification.outcome == VerificationOutcome.VERIFIED:
+                                h.status = HypothesisStatus.VERIFIED
+                            elif verification.outcome == VerificationOutcome.REJECTED:
+                                h.status = HypothesisStatus.REJECTED
+                            else:
+                                h.status = HypothesisStatus.WEAKENED
+
+                        await self._emit(hypothesis_updated(
+                            incident.id, h.id, h.status.value, h.score
+                        ))
+
+                await self._emit(belief_updated(
+                    incident.id, updated_scores
+                ))
+                self._timeline(ctx, "belief.updated", "Confidence scores updated",
+                               str(updated_scores))
+
+                # ── DECISION POINT ──────────────────────────────────
+                if verification.outcome == VerificationOutcome.VERIFIED:
+                    # Proceed to remediation
+                    break
+                elif verification.outcome == VerificationOutcome.REJECTED:
+                    # Re-hypothesize
+                    self._timeline(ctx, "hypothesis.rejected",
+                                   "Leading hypothesis rejected — re-hypothesizing")
+                    ctx.state_machine.transition(InvestigationState.HYPOTHESIS_GENERATION)
+                    continue
+                else:
+                    # Inconclusive — try another experiment
+                    self._timeline(ctx, "experiment.inconclusive",
+                                   "Experiment inconclusive — designing new experiment")
+                    ctx.state_machine.transition(InvestigationState.EXPERIMENT_DESIGN)
+                    continue
+            else:
+                # Exhausted cycles
+                await self._fail(ctx, "No verified root cause after maximum investigation cycles")
+                return ctx
+
+            # ── REMEDIATION ─────────────────────────────────────────
+            verified_hyp = next(
+                (h for h in ctx.hypotheses if h.status == HypothesisStatus.VERIFIED),
+                None,
+            )
+            if not verified_hyp:
+                await self._fail(ctx, "No verified hypothesis found")
+                return ctx
+
+            ctx.state_machine.transition(InvestigationState.REMEDIATION)
+            ctx.incident.status = InvestigationState.REMEDIATION
+
+            supporting_evidence = [
+                e for e in ctx.evidence
+                if e.id in verified_hyp.supporting_evidence
+            ]
+            last_experiment = ctx.experiments[-1] if ctx.experiments else None
+
+            remediation_input = RemediationInput(
+                incident_id=incident.id,
+                verified_hypothesis=verified_hyp,
+                root_cause_evidence=supporting_evidence,
+                experiment_summary=(
+                    f"Intervention '{last_experiment.intervention.type}' "
+                    f"resulted in {ctx.verifications[-1].outcome.value}"
+                    if last_experiment else "No experiment data"
+                ),
+                service=incident.service,
+            )
+            remediation_output = await self._remediation.generate(remediation_input)
+            remediation = Remediation(
+                incident_id=incident.id,
+                hypothesis_id=verified_hyp.id,
+                type=remediation_output.type,
+                title=remediation_output.title,
+                description=remediation_output.description,
+                diff=remediation_output.diff,
+                config_change=remediation_output.config_change,
+            )
+            ctx.remediation = remediation
+
+            await self._emit(remediation_generated(
+                incident.id, remediation.id, remediation.title
+            ))
+            self._timeline(ctx, "remediation.generated",
+                           remediation.title, remediation.description)
+
+            # ── REMEDIATION VALIDATION ──────────────────────────────
+            # Apply remediation in Digital Twin, replay incident, compare
+            ctx.state_machine.transition(InvestigationState.REMEDIATION_VALIDATION)
+            ctx.incident.status = InvestigationState.REMEDIATION_VALIDATION
+
+            validation_passed = self._validate_remediation(
+                ctx, scenario, remediation
+            )
+            remediation.validation_status = "validated" if validation_passed else "failed"
+
+            await self._emit(remediation_validated(
+                incident.id, remediation.id, validation_passed
+            ))
+
+            if not validation_passed:
+                remediation.validation_detail = "Post-fix metrics did not meet healthy baseline"
+                self._timeline(ctx, "remediation.validation_failed",
+                               "Remediation validation failed")
+                await self._fail(ctx, "Remediation validation failed")
+                return ctx
+
+            self._timeline(ctx, "remediation.validated",
+                           "Remediation validated — metrics within healthy baseline")
+
+            # ── RESOLVED ────────────────────────────────────────────
+            ctx.state_machine.transition(InvestigationState.RESOLVED)
+            ctx.incident.status = InvestigationState.RESOLVED
+            ctx.incident.resolved_at = now()
+
+            final_confidence = verified_hyp.score
+            await self._emit(incident_resolved(
+                incident.id, verified_hyp.statement, final_confidence
+            ))
+            self._timeline(ctx, "incident.resolved",
+                           f"Resolved: {verified_hyp.statement}",
+                           f"Confidence: {final_confidence:.0%}")
+
+            # ── STORE IN MEMORY ─────────────────────────────────────
+            if self._memory and self._fingerprinter:
+                await self._store_memory(ctx, verified_hyp)
+
+        except Exception as exc:
+            logger.error("Investigation failed: %s", exc, exc_info=True)
+            await self._fail(ctx, f"Unexpected error: {exc}")
+
+        return ctx
+
+    def _validate_remediation(
+        self,
+        ctx: InvestigationContext,
+        scenario: dict,
+        remediation: Remediation,
+    ) -> bool:
+        """Apply remediation to a fresh twin, replay incident, check metrics.
+
+        Lifecycle:
+        1. Create fresh twin with fault injected
+        2. Apply remediation (fix the root cause in simulation)
+        3. Run simulation for the observation window
+        4. Compare metrics against healthy baseline
+        5. Return pass/fail
+        """
+        # Create twin with the original fault
+        twin = self._twin_factory(scenario)
+
+        # Replay the exact registered intervention whose prediction was
+        # deterministically verified. A remediation document cannot inject
+        # arbitrary simulator actions or modify host files.
+        verified_experiment = next(
+            (experiment for experiment in reversed(ctx.experiments)
+             if experiment.target_hypothesis == remediation.hypothesis_id and experiment.status == "completed"),
+            None,
+        )
+        if not verified_experiment:
+            return False
+        twin.apply_intervention(
+            verified_experiment.intervention.type,
+            verified_experiment.intervention.parameters,
+        )
+
+        # Run simulation with fix applied
+        twin.tick(steps=20)
+        post_fix = twin.observe()
+
+        # Compare against healthy thresholds
+        healthy_p95 = 120.0   # ms
+        healthy_error = 0.02  # 2%
+        healthy_cpu = 0.40
+
+        checks = [
+            post_fix.p95_latency < healthy_p95 * 3,   # within 3x of healthy
+            post_fix.error_rate < healthy_error * 3,
+            post_fix.cpu < healthy_cpu * 2,
+        ]
+
+        return all(checks)
+
+    async def _store_memory(self, ctx: InvestigationContext, verified: Hypothesis) -> None:
+        """Store resolved incident in memory for future retrieval."""
+        fp = self._fingerprinter.fingerprint(
+            ctx.incident, ctx.incident.symptoms, ctx.evidence
+        )
+        last_obs = ctx.observations[-1] if ctx.observations else None
+        record = IncidentMemoryRecord(
+            incident_id=ctx.incident.id,
+            fingerprint=fp,
+            symptoms=ctx.incident.symptoms,
+            evidence_summary=[e.observation[:100] for e in ctx.evidence[:10]],
+            root_cause=verified.statement,
+            experiment_summary=(
+                f"Ran {len(ctx.experiments)} experiments, "
+                f"verified via {ctx.verifications[-1].outcome.value}"
+                if ctx.verifications else "No experiments"
+            ),
+            verified_intervention=(
+                ctx.experiments[-1].intervention.type
+                if ctx.experiments else "none"
+            ),
+            remediation_summary=(
+                ctx.remediation.title if ctx.remediation else "none"
+            ),
+            post_fix_metrics=(
+                last_obs.post_intervention if last_obs else None
+            ),
+        )
+        await self._memory.store(record)
+
+    async def _fail(self, ctx: InvestigationContext, reason: str) -> None:
+        if not ctx.state_machine.is_terminal:
+            try:
+                ctx.state_machine.transition(InvestigationState.FAILED)
+            except Exception:
+                pass
+        ctx.incident.status = InvestigationState.FAILED
+        self._timeline(ctx, "investigation.failed", "Investigation failed", reason)
+        await self._emit(investigation_failed(ctx.incident.id, reason))
+        logger.error("Investigation %s failed: %s", ctx.incident.id, reason)
