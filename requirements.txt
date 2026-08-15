@@ -1,0 +1,6 @@
+# Root requirements — install everything needed to run and test IncidentForge
+-r apps/api/requirements.txt
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
