@@ -1,0 +1,32 @@
+{
+  "name": "incidentforge-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/node": "20.x",
+    "@types/react": "18.x",
+    "@types/react-dom": "18.x",
+    "next": "14.2.3",
+    "react": "18.x",
+    "react-dom": "18.x",
+    "recharts": "^2.12.7",
+    "@xyflow/react": "^12.0.0",
+    "lucide-react": "^0.378.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0"
+  },
+  "devDependencies": {
+    "typescript": "5.x",
+    "tailwindcss": "3.4.3",
+    "postcss": "8.4.38",
+    "autoprefixer": "10.4.19",
+    "eslint": "8.x",
+    "eslint-config-next": "14.2.3"
+  }
+}
