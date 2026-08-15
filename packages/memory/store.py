@@ -3,6 +3,8 @@ import math
 from packages.contracts.domain import IncidentMemoryRecord, IncidentFingerprint
 
 class IncidentMemoryStore:
+    MIN_SIMILARITY = 0.3
+
     def __init__(self):
         # In-memory storage for now
         self._records: List[IncidentMemoryRecord] = []
@@ -13,19 +15,28 @@ class IncidentMemoryStore:
 
     async def find_similar(self, fingerprint: IncidentFingerprint, limit: int = 5) -> List[IncidentMemoryRecord]:
         """Finds similar incidents using cosine similarity."""
-        # For in-memory implementation, we assume fingerprint has an 'embedding' property 
-        # or we compare based on some text. 
-        # In a real DB, we would use pgvector.
-        if not hasattr(fingerprint, 'embedding') or fingerprint.embedding is None:
-            return []
+        """Use embeddings when both sides have them, otherwise structural similarity.
 
-        scored_records = []
+        The fallback is intentionally kept here so every caller (including the
+        repository) gets identical ranking and minimum-match behaviour.
+        """
+        from packages.memory.fingerprint import IncidentFingerprinter
+
+        fingerprinter = IncidentFingerprinter()
+        scored_records: list[tuple[float, IncidentMemoryRecord]] = []
         for record in self._records:
-            if not record.fingerprint or not record.fingerprint.embedding:
+            if not record.fingerprint:
                 continue
-            
-            sim = self._cosine_similarity(fingerprint.embedding, record.fingerprint.embedding)
-            scored_records.append((sim, record))
+
+            if fingerprint.embedding and record.fingerprint.embedding:
+                sim = self._cosine_similarity(
+                    fingerprint.embedding, record.fingerprint.embedding
+                )
+            else:
+                sim = fingerprinter.similarity(fingerprint, record.fingerprint)
+
+            if sim >= self.MIN_SIMILARITY:
+                scored_records.append((sim, record))
             
         scored_records.sort(key=lambda x: x[0], reverse=True)
         return [record for score, record in scored_records[:limit]]

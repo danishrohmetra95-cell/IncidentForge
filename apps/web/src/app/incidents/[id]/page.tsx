@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Beaker, Database, FileSearch, Network, ShieldCheck } from "lucide-react";
+import { Activity, Beaker, Database, FileSearch, GitBranch, Network, ShieldCheck, ChevronDown, ChevronUp } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { IncidentDetail, TelemetrySnapshot } from "@/lib/types";
@@ -20,6 +20,7 @@ const metricCards: Array<{ key: keyof TelemetrySnapshot; label: string; format: 
 export default function IncidentCommandCenter({ params }: { params: { id: string } }) {
   const [incident, setIncident] = useState<IncidentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -30,20 +31,23 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
     }
   }, [params.id]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
-  useEffect(() => {
-    if (!incident || ["RESOLVED", "FAILED"].includes(incident.status)) return;
-    const interval = window.setInterval(() => void refresh(), 1200);
-    return () => window.clearInterval(interval);
-  }, [incident, refresh]);
+  useEffect(() => { 
+    void refresh(); 
+    const es = api.subscribeToEvents(params.id, () => {
+      void refresh();
+    });
+    return () => es.close();
+  }, [params.id, refresh]);
 
   if (error) return <main className="p-8 text-sm text-status-red">{error}</main>;
-  if (!incident) return <main className="p-8 font-mono text-sm text-text-secondary">Loading investigation artifacts…</main>;
+  if (!incident) return <main className="p-8 font-mono text-sm text-text-secondary animate-pulse">Loading investigation artifacts…</main>;
 
   const observation = incident.observations.at(-1);
   const verification = incident.verifications.at(-1);
   const currentMetrics = observation?.post_intervention ?? observation?.baseline;
   const experiment = incident.experiments.at(-1);
+
+  const evidenceToShow = evidenceExpanded ? incident.evidence : incident.evidence.slice(0, 5);
 
   return (
     <main className="mx-auto max-w-7xl p-6 md:p-10">
@@ -55,7 +59,10 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
             <p className="mt-2 max-w-3xl text-sm text-text-secondary">{incident.description}</p>
             <p className="mt-4 font-mono text-xs text-text-secondary">{incident.service} · {incident.id}</p>
           </div>
-          {experiment && <Link href={`/incidents/${incident.id}/experiment`} className="inline-flex items-center rounded bg-brand px-4 py-2.5 text-sm font-bold text-background hover:bg-brand/90"><Beaker className="mr-2 h-4 w-4" />Open Experiment Lab</Link>}
+          <div className="flex flex-wrap gap-3">
+            {experiment && <Link href={`/incidents/${incident.id}/experiment`} className="inline-flex items-center rounded bg-brand px-4 py-2.5 text-sm font-bold text-background hover:bg-brand/90"><Beaker className="mr-2 h-4 w-4" />Open Experiment Lab</Link>}
+            {incident.experiments && incident.experiments.length > 0 && <Link href={`/incidents/${incident.id}/counterfactual`} className="inline-flex items-center rounded bg-brand px-4 py-2.5 text-sm font-bold text-background hover:bg-brand/90"><GitBranch className="mr-2 h-4 w-4" />Counterfactual Analysis</Link>}
+          </div>
         </div>
       </header>
 
@@ -71,7 +78,17 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
         </section>
 
         <aside className="space-y-6">
-          <section><div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-text-secondary"><FileSearch className="h-4 w-4 text-brand" />Evidence</div><div className="space-y-2">{incident.evidence.slice(0, 6).map((evidence) => <article key={evidence.id} className="rounded border border-surface-elevated bg-surface p-3"><p className="mb-1 font-mono text-[10px] uppercase text-brand">{evidence.type} · strength {Math.round(evidence.strength * 100)}%</p><p className="text-sm text-text-secondary">{evidence.observation}</p></article>)}</div></section>
+          <section>
+            <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-text-secondary"><FileSearch className="h-4 w-4 text-brand" />Evidence</div>
+            <div className="space-y-2">
+              {evidenceToShow.map((evidence) => <article key={evidence.id} className="rounded border border-surface-elevated bg-surface p-3"><p className="mb-1 font-mono text-[10px] uppercase text-brand">{evidence.type} · strength {Math.round(evidence.strength * 100)}%</p><p className="text-sm text-text-secondary">{evidence.observation}</p></article>)}
+            </div>
+            {incident.evidence.length > 5 && (
+              <button onClick={() => setEvidenceExpanded(!evidenceExpanded)} className="mt-3 flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition">
+                {evidenceExpanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Show {incident.evidence.length - 5} more evidence items</>}
+              </button>
+            )}
+          </section>
           {verification && <section className="rounded border border-surface-elevated bg-surface p-5"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-text-secondary"><ShieldCheck className="h-4 w-4 text-brand" />Deterministic verdict</div><VerificationBadge result={verification.outcome} /></div><p className="text-sm text-text-secondary">{verification.explanation}</p></section>}
         </aside>
       </div>

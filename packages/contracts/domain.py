@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -289,6 +289,7 @@ class AgentRun(DomainModel):
     error: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    output_validation_status: Literal["validated", "repaired", "failed"] | None = None
 
 
 class TimelineEvent(DomainModel):

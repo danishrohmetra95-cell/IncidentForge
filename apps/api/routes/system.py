@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from apps.api.routes.incidents import _incidents, _investigations
+from apps.api.persistence.repository import get_repository
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -11,8 +11,8 @@ router = APIRouter(prefix="/api", tags=["system"])
 async def list_models():
     """List available Featherless models."""
     try:
-        from packages.llm.gateway import ModelGateway
-        gw = ModelGateway()
+        from apps.api.services import get_gateway
+        gw = get_gateway()
         models = await gw.list_models()
         return {"models": models}
     except Exception as e:
@@ -22,15 +22,20 @@ async def list_models():
 @router.get("/incidents/{incident_id}/counterfactual")
 async def get_counterfactual(incident_id: str):
     """Run counterfactual analysis for a resolved incident."""
-    if incident_id not in _incidents:
+    repo = get_repository()
+    inc = await repo.get_incident(incident_id)
+    if not inc:
         raise HTTPException(status_code=404, detail="Incident not found")
 
-    record = _incidents[incident_id]
-    scenario_data = record["scenario_data"]
-    ctx = _investigations.get(incident_id)
-
+    ctx = repo._contexts.get(incident_id)
     if not ctx or not ctx.experiments:
         raise HTTPException(status_code=400, detail="No experiments to replay")
+
+    # Load scenario data for twin construction
+    scenario_data = {}
+    if inc.scenario_id:
+        from packages.simulator.scenarios import load_scenario
+        scenario_data = load_scenario(inc.scenario_id)
 
     from packages.simulator.scenarios import create_twin_from_scenario
     from packages.experiments.counterfactual import CounterfactualEngine

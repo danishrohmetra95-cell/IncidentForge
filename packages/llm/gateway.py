@@ -91,9 +91,13 @@ class ModelGateway:
         )
         
         raw_content = response.choices[0].message.content
-        from packages.llm.structured import StructuredOutputParser
+        from packages.llm.structured import StructuredOutputParser, output_validation_status
         parser = StructuredOutputParser()
-        return parser.parse(raw_content, output_schema)
+        try:
+            return parser.parse(raw_content, output_schema)
+        except Exception:
+            output_validation_status.set("failed")
+            raise
 
     async def stream(self, messages: list[dict], model: str, agent_name: str = "default") -> AsyncIterator[str]:
         self._ensure_configured()

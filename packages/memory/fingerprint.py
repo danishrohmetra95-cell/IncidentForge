@@ -6,15 +6,20 @@ class IncidentFingerprinter:
         services = set()
         metrics = set()
         
+        if hasattr(incident, 'service') and incident.service:
+            services.add(incident.service)
+            
         for symptom in symptoms:
-            if hasattr(symptom, 'service'):
-                services.add(symptom.service)
+            if hasattr(symptom, 'metric') and symptom.metric:
+                metrics.add(symptom.metric)
                 
         for ev in evidence:
-            if hasattr(ev, 'metric_name'):
-                metrics.add(ev.metric_name)
-            if hasattr(ev, 'service'):
-                services.add(ev.service)
+            if hasattr(ev, 'source') and ev.source:
+                services.add(ev.source)
+
+        # Ensure we always have a service
+        if not services:
+            services.add("unknown")
 
         # In a real system, we'd also generate embeddings here using EmbeddingProvider
         return IncidentFingerprint(
@@ -32,9 +37,10 @@ class IncidentFingerprinter:
 
         services_sim = jaccard(set(a.services), set(b.services))
         metrics_sim = jaccard(set(a.metric_patterns), set(b.metric_patterns))
+        symptoms_sim = jaccard(set(a.symptoms), set(b.symptoms))
         
         # Simple weighted average
-        return (services_sim * 0.6) + (metrics_sim * 0.4)
+        return (services_sim * 0.3) + (metrics_sim * 0.3) + (symptoms_sim * 0.4)
 
     def to_text(self, fp: IncidentFingerprint) -> str:
         services_text = ", ".join(fp.services)

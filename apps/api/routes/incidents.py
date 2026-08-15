@@ -13,30 +13,13 @@ from packages.contracts.domain import (
     Severity,
     new_id,
 )
+from apps.api.persistence.repository import get_repository
 from packages.simulator.scenarios import load_scenario, list_scenarios, create_twin_from_scenario
 
 logger = logging.getLogger("incidentforge.api")
 
 router = APIRouter(prefix="/api", tags=["incidents"])
 
-# ── In-memory store (replaced by DB in production) ───────────────
-_incidents: dict[str, dict] = {}
-_investigations: dict[str, Any] = {}  # incident_id -> InvestigationContext
-
-
-def _store_incident(incident: Incident, scenario_data: dict | None = None) -> dict:
-    record = {
-        "incident": incident,
-        "scenario_data": scenario_data or {},
-    }
-    _incidents[incident.id] = record
-    return record
-
-
-def _get_incident(incident_id: str) -> dict:
-    if incident_id not in _incidents:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-    return _incidents[incident_id]
 
 
 # ── Request / Response schemas ───────────────────────────────────
@@ -91,7 +74,8 @@ async def create_incident(req: CreateIncidentRequest):
         service=req.service,
         scenario_id=req.scenario_id,
     )
-    _store_incident(incident, scenario_data)
+    repo = get_repository()
+    await repo.save_incident(incident)
 
     return {"id": incident.id, "status": incident.status.value}
 
@@ -99,10 +83,10 @@ async def create_incident(req: CreateIncidentRequest):
 @router.get("/incidents")
 async def list_incidents():
     """List all incidents."""
+    repo = get_repository()
     results = []
-    for record in _incidents.values():
-        inc = record["incident"]
-        ctx = _investigations.get(inc.id)
+    for inc in await repo.list_incidents():
+        ctx = repo._contexts.get(inc.id)
         results.append({
             "id": inc.id,
             "title": inc.title,
@@ -121,9 +105,11 @@ async def list_incidents():
 @router.get("/incidents/{incident_id}")
 async def get_incident(incident_id: str):
     """Get full incident details including investigation state."""
-    record = _get_incident(incident_id)
-    inc = record["incident"]
-    ctx = _investigations.get(incident_id)
+    repo = get_repository()
+    inc = await repo.get_incident(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+    ctx = repo._contexts.get(incident_id)
 
     response = {
         "id": inc.id,
@@ -205,6 +191,7 @@ async def get_incident(incident_id: str):
                 "diff": ctx.remediation.diff,
                 "config_change": ctx.remediation.config_change,
                 "validation_status": ctx.remediation.validation_status,
+                "validation_detail": ctx.remediation.validation_detail,
             }
         response["timeline"] = [
             {
@@ -225,8 +212,10 @@ async def get_incident(incident_id: str):
 @router.post("/incidents/{incident_id}/start")
 async def start_investigation(incident_id: str, background_tasks: BackgroundTasks):
     """Trigger autonomous investigation for an incident."""
-    record = _get_incident(incident_id)
-    inc = record["incident"]
+    repo = get_repository()
+    inc = await repo.get_incident(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
 
     if inc.status != InvestigationState.CREATED:
         raise HTTPException(
@@ -239,9 +228,9 @@ async def start_investigation(incident_id: str, background_tasks: BackgroundTask
 
 
 @router.post("/incidents/demo")
-async def create_demo_incident(background_tasks: BackgroundTasks):
+async def create_demo_incident(background_tasks: BackgroundTasks, scenario_id: str = "incident-001-db-pool"):
     """Create and auto-start the primary demo incident."""
-    scenario_data = load_scenario("incident-001-db-pool")
+    scenario_data = load_scenario(scenario_id)
 
     incident = Incident(
         title=scenario_data["title"],
@@ -250,7 +239,8 @@ async def create_demo_incident(background_tasks: BackgroundTasks):
         service=scenario_data["service"],
         scenario_id=scenario_data["id"],
     )
-    _store_incident(incident, scenario_data)
+    repo = get_repository()
+    await repo.save_incident(incident)
 
     background_tasks.add_task(_run_investigation, incident.id)
 
@@ -263,8 +253,10 @@ async def create_demo_incident(background_tasks: BackgroundTasks):
 
 @router.get("/incidents/{incident_id}/timeline")
 async def get_timeline(incident_id: str):
-    _get_incident(incident_id)
-    ctx = _investigations.get(incident_id)
+    repo = get_repository()
+    if not await repo.get_incident(incident_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    ctx = repo._contexts.get(incident_id)
     if not ctx:
         return []
     return [
@@ -283,8 +275,10 @@ async def get_timeline(incident_id: str):
 
 @router.get("/incidents/{incident_id}/evidence")
 async def get_evidence(incident_id: str):
-    _get_incident(incident_id)
-    ctx = _investigations.get(incident_id)
+    repo = get_repository()
+    if not await repo.get_incident(incident_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    ctx = repo._contexts.get(incident_id)
     if not ctx:
         return []
     return [e.model_dump() for e in ctx.evidence]
@@ -292,8 +286,10 @@ async def get_evidence(incident_id: str):
 
 @router.get("/incidents/{incident_id}/hypotheses")
 async def get_hypotheses(incident_id: str):
-    _get_incident(incident_id)
-    ctx = _investigations.get(incident_id)
+    repo = get_repository()
+    if not await repo.get_incident(incident_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    ctx = repo._contexts.get(incident_id)
     if not ctx:
         return []
     return [
@@ -316,15 +312,22 @@ async def _run_investigation(incident_id: str) -> None:
     """Run the full investigation lifecycle in the background."""
     from apps.api.services import build_orchestrator, get_gateway
 
-    record = _incidents[incident_id]
-    incident = record["incident"]
-    scenario_data = record["scenario_data"]
+    repo = get_repository()
+    incident = await repo.get_incident(incident_id)
+    if not incident:
+        return
+    scenario_data = load_scenario(incident.scenario_id) if incident.scenario_id else {}
 
+    ctx = None
     try:
         incident.reasoning_mode = "live_model" if get_gateway().is_configured else "deterministic_demo"
         orchestrator, event_bus = await build_orchestrator(incident_id)
         ctx = await orchestrator.run(incident, scenario_data)
-        _investigations[incident_id] = ctx
+        await repo.save_context(ctx)
     except Exception as exc:
         logger.error("Investigation failed for %s: %s", incident_id, exc, exc_info=True)
         incident.status = InvestigationState.FAILED
+        await repo.save_incident(incident)
+        # Persist whatever context was accumulated before the failure
+        if ctx is not None:
+            await repo.save_context(ctx)

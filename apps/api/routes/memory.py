@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from apps.api.routes.incidents import _incidents, _investigations
+from apps.api.persistence.repository import get_repository
 from apps.api.services import get_memory_store
 from packages.memory.fingerprint import IncidentFingerprinter
 
@@ -12,7 +12,9 @@ router = APIRouter(prefix="/api", tags=["memory"])
 @router.get("/incidents/{incident_id}/memory")
 async def get_incident_memory(incident_id: str):
     """Get the stored memory record for a resolved incident."""
-    if incident_id not in _incidents:
+    repo = get_repository()
+    inc = await repo.get_incident(incident_id)
+    if not inc:
         raise HTTPException(status_code=404, detail="Incident not found")
     record = await get_memory_store().get_by_incident(incident_id)
     if record is None:
@@ -23,17 +25,19 @@ async def get_incident_memory(incident_id: str):
 @router.get("/memory/similar/{incident_id}")
 async def get_similar_incidents(incident_id: str):
     """Find similar historical incidents."""
-    if incident_id not in _incidents:
+    repo = get_repository()
+    inc = await repo.get_incident(incident_id)
+    if not inc:
         raise HTTPException(status_code=404, detail="Incident not found")
     record = await get_memory_store().get_by_incident(incident_id)
     if record is not None:
         fingerprint = record.fingerprint
     else:
-        context = _investigations.get(incident_id)
-        if context is None:
+        ctx = repo._contexts.get(incident_id)
+        if ctx is None:
             return {"incident_id": incident_id, "similar": []}
         fingerprint = IncidentFingerprinter().fingerprint(
-            context.incident, context.incident.symptoms, context.evidence
+            ctx.incident, ctx.incident.symptoms, ctx.evidence
         )
     similar = await get_memory_store().find_similar(fingerprint, limit=5)
     return {

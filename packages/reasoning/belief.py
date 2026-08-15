@@ -43,6 +43,7 @@ class BeliefUpdateEngine:
         verifications: list[VerificationResult],
         evidence: list[Evidence],
         experiments: list[Experiment],
+        historical_matches: dict[str, bool] | None = None,
     ) -> dict[str, float]:
         """Compute updated scores for all hypotheses. Returns {hypothesis_id: score}."""
         raw_scores: dict[str, float] = {}
@@ -78,6 +79,10 @@ class BeliefUpdateEngine:
                     score += self.EXPERIMENT_VERIFIED
                 elif v.outcome == VerificationOutcome.REJECTED:
                     score += self.EXPERIMENT_REJECTED
+
+            # Historical match bonus
+            if historical_matches and historical_matches.get(h.id):
+                score += self.HISTORICAL_BONUS
 
             # Clamp to [0.01, 0.99]
             raw_scores[h.id] = max(0.01, min(0.99, score))

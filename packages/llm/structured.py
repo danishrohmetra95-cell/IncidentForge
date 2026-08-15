@@ -1,12 +1,20 @@
 import json
 import logging
 import re
+from contextvars import ContextVar
 from typing import TypeVar, Type
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+# Set by the parser in the same async task as the gateway call.  The
+# orchestrator consumes it immediately when recording the corresponding
+# AgentRun, so concurrent investigations cannot overwrite one another.
+output_validation_status: ContextVar[str] = ContextVar(
+    "output_validation_status", default="validated"
+)
 
 class StructuredOutputError(Exception):
     pass
@@ -17,10 +25,14 @@ class StructuredOutputParser:
             # Attempt to extract json if it is wrapped in markdown
             extracted_json = self._extract_json(raw)
             data = json.loads(extracted_json)
-            return schema(**data)
+            parsed = schema(**data)
+            output_validation_status.set("validated")
+            return parsed
         except (json.JSONDecodeError, ValidationError) as e:
             logger.warning(f"Initial parse failed: {e}. Attempting repair.")
-            return self._repair_and_parse(raw, schema)
+            parsed = self._repair_and_parse(raw, schema)
+            output_validation_status.set("repaired")
+            return parsed
             
     def _extract_json(self, raw: str) -> str:
         # Match markdown json blocks

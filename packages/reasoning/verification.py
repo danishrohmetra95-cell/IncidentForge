@@ -52,8 +52,8 @@ class VerificationEngine:
                 passed = pct_change >= threshold
                 expected_desc = f"increase >= {threshold}%"
             else:  # STABLE
-                passed = abs(pct_change) < 5.0
-                expected_desc = "change < 5%"
+                passed = abs(pct_change) < threshold
+                expected_desc = f"change < {threshold}%"
 
             detail = (
                 f"{metric}: baseline={base_val:.2f}, post={post_val:.2f}, "
