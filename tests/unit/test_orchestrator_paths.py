@@ -128,6 +128,17 @@ class TestOrchestratorPaths:
         transitions = [(history[i], history[i+1]) for i in range(len(history)-1)]
         assert (InvestigationState.BELIEF_UPDATE, InvestigationState.HYPOTHESIS_GENERATION) in transitions
 
+        # Assert the belief for the rejected hypothesis went down or was limited
+        rejected_hyps = [h for h in ctx.hypotheses if h.statement == mock_agents.first_cycle_hypothesis_statement]
+        if rejected_hyps:
+            rejected_hyp = rejected_hyps[0]
+            assert rejected_hyp.status == HypothesisStatus.REJECTED
+            assert rejected_hyp.score < 0.99  # It shouldn't be confident
+
+            # Assert final verified hypothesis is confident
+            verified_hyp = next(h for h in ctx.hypotheses if h.status == HypothesisStatus.VERIFIED)
+            assert verified_hyp.score > rejected_hyp.score
+
     @pytest.mark.asyncio
     async def test_inconclusive_experiment_retries_with_new_experiment(self, setup_orchestrator):
         orchestrator, incident, scenario, mock_agents = setup_orchestrator
