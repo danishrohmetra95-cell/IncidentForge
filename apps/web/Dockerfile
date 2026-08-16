@@ -1,7 +1,11 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
+
+# Context is root, so we must copy from apps/web
+COPY apps/web/package*.json ./
 RUN npm ci
-COPY . .
+
+COPY apps/web/ ./
 RUN npm run build
+
 CMD ["npm", "start"]

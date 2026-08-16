@@ -123,7 +123,7 @@ flowchart TD
 IncidentForge is structured as a modular monorepo cleanly separating UI, API routing, orchestration, agent definitions, simulation models, and deterministic reasoning engines.
 
 ```
-c:\Users\danis\Desktop\IncidentForge\
+IncidentForge/
 ├── apps/
 │   ├── api/                  # FastAPI backend service
 │   │   ├── routes/           # REST & SSE route controllers

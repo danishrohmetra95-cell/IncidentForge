@@ -15,8 +15,6 @@ web:
 migrate:
 	cd apps/api && alembic upgrade head
 
-seed:
-	cd apps/api && python -m seed
 
 test:
 	pytest tests/ -v
