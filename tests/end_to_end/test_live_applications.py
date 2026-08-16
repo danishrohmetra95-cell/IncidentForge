@@ -78,3 +78,37 @@ async def test_degraded_live_observation_inconclusive():
     assert inc["status"] == InvestigationState.RESOLVED.value
     assert inc["reasoning_mode"] == "live_model"
 
+@pytest.mark.asyncio
+async def test_amazon_demo_observation():
+    # Calling actual connect API since the connector directly intercepts "amazon.in"
+    res = client.post("/api/applications/connect", json={"url": "https://www.amazon.in"})
+    assert res.status_code == 200
+    obs = res.json()["observation"]
+    assert obs["status"] == "DEGRADED"
+    assert obs["error_message"] == "SIMULATED LIVE DEMO"
+    
+    obs_id = obs["id"]
+    res = client.post(f"/api/applications/{obs_id}/create-incident")
+    inc_id = res.json()["incident_id"]
+    
+    res = client.get(f"/api/incidents/{inc_id}")
+    inc = res.json()
+    assert inc["reasoning_mode"] == "deterministic_demo"
+    assert inc["status"] == InvestigationState.CREATED.value
+    
+    await _run_investigation(inc_id)
+    
+    res = client.get(f"/api/incidents/{inc_id}")
+    inc = res.json()
+    
+    # Should resolve with hypotheses
+    assert inc["status"] == InvestigationState.RESOLVED.value
+    assert inc["reasoning_mode"] == "deterministic_demo"
+    
+    from apps.api.persistence.repository import get_repository
+    repo = get_repository()
+    ctx = repo._contexts.get(inc_id)
+    assert len(ctx.hypotheses) == 3
+    assert len(ctx.verifications) > 0
+    assert ctx.remediation is not None
+    assert "upstream_timeout_ms" in ctx.remediation.config_change

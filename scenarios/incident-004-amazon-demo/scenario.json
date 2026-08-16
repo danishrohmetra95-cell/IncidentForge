@@ -1,0 +1,29 @@
+{
+  "id": "incident-004-amazon-demo",
+  "title": "Amazon Demo Investigation",
+  "description": "Simulated live investigation for Amazon presentation.",
+  "service": "amazon.in",
+  "severity": "SEV_2",
+  "fault": {
+    "type": "upstream_latency",
+    "deployment_version": "v1.0",
+    "leak_rate": 0,
+    "request_rate": 1000,
+    "initial_cache_degradation": 0,
+    "cpu_overhead": 0
+  },
+  "initial_telemetry": {
+    "request_rate": 1000,
+    "p95_latency": 875,
+    "error_rate": 0.008,
+    "db_utilization": 0.3,
+    "cpu": 0.2,
+    "cache_hit_rate": 0.95
+  },
+  "recent_events": [
+    "External HTTP observations indicate degraded performance",
+    "P95 latency elevated to 875ms"
+  ],
+  "expected_root_cause": "Elevated upstream request latency",
+  "ambiguity_note": "Presentation fixture"
+}

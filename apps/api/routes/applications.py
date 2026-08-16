@@ -41,14 +41,17 @@ async def create_incident(
         raise HTTPException(status_code=404, detail="Observation not found")
         
     status = InvestigationState.RESOLVED if observation.status.value == "HEALTHY" else InvestigationState.CREATED
+    
+    is_amazon_demo = "amazon.in" in observation.application_url.lower()
 
     incident = Incident(
         title=f"Application Incident: {observation.application_url}",
         description=f"Live application observation indicates {observation.status.value.lower()} state. HTTP {observation.http_status}, {observation.error_rate * 100:.1f}% errors.",
-        severity="SEV_2" if observation.status == "UNAVAILABLE" else "SEV_3",
+        severity="SEV_2" if observation.status.value == "UNAVAILABLE" else "SEV_3",
         service=observation.application_url,
         status=status,
-        reasoning_mode="live_model"
+        reasoning_mode="deterministic_demo" if is_amazon_demo else "live_model",
+        scenario_id="incident-004-amazon-demo" if is_amazon_demo else None
     )
     
     ctx = InvestigationContext(incident=incident)

@@ -76,6 +76,11 @@ export default function MemoryPage() {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <SeverityBadge severity={record.incident.severity} />
                       <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary">{record.incident.service}</span>
+                      {record.incident.service.toLowerCase().includes("amazon.in") && (
+                        <span className="rounded bg-brand/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-brand border border-brand/30 font-bold">
+                          DEMO RECORD
+                        </span>
+                      )}
                       {record.similarity !== undefined && (
                         <span className="rounded bg-brand/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-brand border border-brand/20">
                           {Math.round(record.similarity * 100)}% Match

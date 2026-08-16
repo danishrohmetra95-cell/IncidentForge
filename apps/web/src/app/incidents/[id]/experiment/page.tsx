@@ -57,17 +57,24 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
 
   return (
     <main className="mx-auto w-full max-w-[1400px] p-6 lg:p-8 animate-in fade-in duration-300">
-      <header className="mb-6">
-        <div className="mb-4">
-          <Link href={`/incidents/${params.id}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-secondary hover:text-white transition-colors">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Command Center
-          </Link>
+      <header className="mb-6 flex items-start justify-between">
+        <div>
+          <div className="mb-4">
+            <Link href={`/incidents/${params.id}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-secondary hover:text-white transition-colors">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Command Center
+            </Link>
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <Beaker className="h-4 w-4 text-brand" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-brand">Digital Twin Operations</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Experiment Lab</h1>
         </div>
-        <div className="flex items-center gap-2 mb-1">
-          <Beaker className="h-4 w-4 text-brand" />
-          <span className="font-mono text-[10px] uppercase tracking-wider text-brand">Digital Twin Operations</span>
-        </div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Experiment Lab</h1>
+        {incident.service.toLowerCase().includes("amazon.in") && (
+          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-brand bg-brand/10 border border-brand/20 px-3 py-1.5 rounded">
+            <FlaskConical className="w-4 h-4" /> SIMULATED EXPERIMENT
+          </div>
+        )}
       </header>
 
       {!incident.experiments || incident.experiments.length === 0 ? (

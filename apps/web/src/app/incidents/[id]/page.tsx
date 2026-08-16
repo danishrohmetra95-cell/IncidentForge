@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Beaker, ChevronDown, ChevronUp, Database, FileSearch, GitBranch, Network, ShieldCheck, Server, AlertTriangle, ArrowRight, CheckCircle2, XCircle, FlaskConical, Play, Target } from "lucide-react";
+import { Activity, Beaker, ChevronDown, ChevronUp, Database, FileSearch, GitBranch, Network, ShieldCheck, Server, AlertTriangle, ArrowRight, CheckCircle2, XCircle, FlaskConical, Play, Target, Globe } from "lucide-react";
 import { ReactFlow, Background, Controls, Node, Edge, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -140,10 +140,16 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
                 {incident.id}
               </span>
               {isLiveMode && (
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-brand bg-brand/10 px-2 py-1 rounded border border-brand/20">
-                  LIVE APPLICATION
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-status-blue bg-status-blue/10 border border-status-blue/20 px-2 py-1 rounded">
+                  <Globe className="w-3 h-3" /> LIVE MODE
                 </span>
               )}
+              {incident.service.toLowerCase().includes("amazon.in") && (
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-brand bg-brand/10 border border-brand/20 px-2 py-1 rounded">
+                  <Activity className="w-3 h-3" /> SIMULATED LIVE DEMO
+                </span>
+              )}
+              {!isLiveMode && <StatusBadge status={incident.status} />}
               {isLiveMode && healthStatusStr && (
                 <span className={`font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${
                   healthStatusStr === 'HEALTHY' ? 'bg-status-green/10 text-status-green border-status-green/20' : 
@@ -405,10 +411,33 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
 
           <section>
             <SectionHeader title="Counterfactual Analysis" icon={Activity} />
-            <Card className="p-4 bg-background/30 border-dashed text-center flex flex-col items-center">
-               <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary mb-1">COUNTERFACTUAL ANALYSIS</span>
-               <p className="text-[11px] text-text-secondary">Available after a validated intervention.</p>
-            </Card>
+            {incident.status === 'RESOLVED' && incident.service.toLowerCase().includes("amazon.in") ? (
+              <Card className="p-4 bg-background/50 border border-brand/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity className="h-4 w-4 text-brand" />
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-brand">SIMULATED COUNTERFACTUAL ANALYSIS</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-surface p-3 rounded text-center">
+                    <div className="text-[10px] uppercase font-mono text-text-secondary mb-1">Actual Failures</div>
+                    <div className="text-xl font-bold text-status-red">4,820</div>
+                  </div>
+                  <div className="bg-surface p-3 rounded text-center">
+                    <div className="text-[10px] uppercase font-mono text-text-secondary mb-1">Counterfactual</div>
+                    <div className="text-xl font-bold text-text-primary">1,050</div>
+                  </div>
+                  <div className="bg-surface p-3 rounded text-center border border-status-green/30">
+                    <div className="text-[10px] uppercase font-mono text-status-green mb-1">Avoided Failures</div>
+                    <div className="text-xl font-bold text-status-green">3,770</div>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-4 bg-background/30 border-dashed text-center flex flex-col items-center">
+                 <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary mb-1">COUNTERFACTUAL ANALYSIS</span>
+                 <p className="text-[11px] text-text-secondary">Available after a validated intervention.</p>
+              </Card>
+            )}
           </section>
 
         </div>

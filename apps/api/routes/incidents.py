@@ -320,7 +320,7 @@ async def _run_investigation(incident_id: str) -> None:
 
     try:
         # Only override reasoning_mode for deterministic incidents, preserve live_model for live apps
-        if incident.scenario_id:
+        if incident.scenario_id and incident.scenario_id != "incident-004-amazon-demo":
             incident.reasoning_mode = "live_model" if get_gateway().is_configured else "deterministic_demo"
             
         orchestrator, event_bus = await build_orchestrator(incident_id)

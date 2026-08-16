@@ -42,6 +42,9 @@ class InterventionRegistry:
         "worker_restart": InterventionDefinition(
             "worker_restart", frozenset({"worker-queue"}), frozenset()
         ),
+        "upstream_latency_mitigation": InterventionDefinition(
+            "upstream_latency_mitigation", frozenset({"upstream-service"}), frozenset()
+        ),
     }
 
     @property

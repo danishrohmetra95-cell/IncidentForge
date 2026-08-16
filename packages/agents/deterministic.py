@@ -135,14 +135,46 @@ class DeterministicScenarioAgents:
 
     async def generate_hypotheses(self, input_data: HypothesisGenerationInput) -> HypothesisGenerationOutput:
         print("EVIDENCE SOURCES:", [e.source for e in input_data.evidence])
+        
+        text = " ".join(e.observation.lower() for e in input_data.evidence)
+        is_amazon_demo = "amazon.in" in text
+
         is_live = any("ApplicationConnector" in e.source for e in input_data.evidence)
-        if is_live:
+        if is_live and not is_amazon_demo:
             return HypothesisGenerationOutput(
                 hypotheses=[],
                 rationale="No causal hypothesis could be established from external HTTP telemetry alone."
             )
             
-        text = " ".join(e.observation.lower() for e in input_data.evidence)
+        if is_amazon_demo:
+            all_evidence = list(range(len(input_data.evidence)))
+            return HypothesisGenerationOutput(
+                hypotheses=[
+                    HypothesisCandidate(
+                        statement="Checkout/API response degradation is being caused by elevated upstream request latency.",
+                        reasoning="SIMULATED REASONING",
+                        initial_score=0.44,
+                        supporting_evidence_indices=all_evidence,
+                        predictions=[Prediction(metric="p95_latency", direction=MetricDirection.DECREASE, threshold_percentage=30)]
+                    ),
+                    HypothesisCandidate(
+                        statement="Cache behavior is increasing request processing time.",
+                        reasoning="SIMULATED REASONING",
+                        initial_score=0.31,
+                        supporting_evidence_indices=all_evidence,
+                        predictions=[Prediction(metric="cache_hit_rate", direction=MetricDirection.INCREASE, threshold_percentage=20)]
+                    ),
+                    HypothesisCandidate(
+                        statement="A recent application change introduced additional request overhead.",
+                        reasoning="SIMULATED REASONING",
+                        initial_score=0.25,
+                        supporting_evidence_indices=all_evidence,
+                        predictions=[Prediction(metric="cpu", direction=MetricDirection.DECREASE, threshold_percentage=10)]
+                    )
+                ],
+                rationale="SIMULATED LIVE DEMO"
+            )
+            
         cache_leads = "cache hit rate measured at 0.15" in text or "cache invalidation" in text
         query_leads = "new product catalog query" in text or "slow queries" in text
 
@@ -198,6 +230,8 @@ class DeterministicScenarioAgents:
             intervention = "cache_ttl_change"
         elif "query performance" in statement:
             intervention = "deployment_rollback"
+        elif "upstream request latency" in statement:
+            intervention = "upstream_latency_mitigation"
         else:
             intervention = "connection_pool_reset"
         alternative = next(
@@ -235,6 +269,13 @@ class DeterministicScenarioAgents:
                 MetricExpectation(metric="db_utilization", direction=MetricDirection.DECREASE, threshold_percentage=30),
             ]
             target, params = "checkout-service", {"target_version": "previous_stable"}
+        elif "upstream request latency" in statement:
+            conditions = [
+                MetricExpectation(metric="p95_latency", direction=MetricDirection.DECREASE, threshold_percentage=30),
+                MetricExpectation(metric="error_rate", direction=MetricDirection.DECREASE, threshold_percentage=25),
+            ]
+            target, params = "upstream-service", {}
+            intervention = "upstream_latency_mitigation"
         else:
             conditions = [
                 MetricExpectation(metric="db_connections", direction=MetricDirection.DECREASE, threshold_percentage=60),
@@ -274,6 +315,15 @@ class DeterministicScenarioAgents:
                 config_change={"target_version": "previous_stable"},
                 verification_steps=["Replay the incident after rollback", "Confirm latency and DB utilization recover"],
                 expected_metric_improvements=["P95 latency falls", "Queue pressure reduces"],
+            )
+        if "upstream request latency" in statement:
+            return RemediationOutput(
+                type=RemediationType.CONFIG_CHANGE,
+                title="Reduce upstream dependency timeout amplification and restore bounded request deadlines.",
+                description="SIMULATED REMEDIATION PREVIEW. This will enforce strict timeout limits on upstream dependency calls to prevent thread exhaustion.",
+                config_change={"upstream_timeout_ms": 1500, "retry_limit": 1},
+                verification_steps=["Replay the incident in the Digital Twin", "Confirm P95 latency and error rate recover"],
+                expected_metric_improvements=["P95 latency decreases", "Error rate normalizes"],
             )
         return RemediationOutput(
             type=RemediationType.CODE_PATCH,

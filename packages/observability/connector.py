@@ -91,6 +91,23 @@ async def safe_fetch(client: httpx.AsyncClient, url: str) -> httpx.Response:
 class ApplicationConnector:
     @staticmethod
     async def observe(url: str) -> LiveApplicationObservation:
+        # 1. AMAZON DEMO FIXTURE
+        url_lower = url.lower()
+        if "amazon.in" in url_lower and ("www.amazon.in" in url_lower or "://amazon.in" in url_lower):
+            # Return deterministic demo payload
+            return LiveApplicationObservation(
+                application_url="https://www.amazon.in",
+                status=HealthStatus.DEGRADED,
+                http_status=200,
+                availability=0.992,
+                p50_latency=210,
+                p95_latency=875,
+                p99_latency=1240,
+                error_rate=0.008,
+                tls_valid=True,
+                error_message="SIMULATED LIVE DEMO"
+            )
+
         observation = LiveApplicationObservation(application_url=url)
         
         try:

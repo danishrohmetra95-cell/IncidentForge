@@ -132,10 +132,21 @@ export default function ConnectApplicationPage() {
                 <p>{error}</p>
               </div>
             )}
-            <div className="mt-4 text-[11px] text-text-secondary flex gap-6">
-              <div className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> SSRF Protected</div>
-              <div className="flex items-center gap-1.5"><Globe className="w-3 h-3" /> HTTP/HTTPS Only</div>
-              <div className="flex items-center gap-1.5"><Activity className="w-3 h-3" /> Read-Only Probes</div>
+            <div className="mt-4 text-[11px] font-mono flex items-center justify-between">
+              <div className="flex gap-6 text-text-secondary">
+                <div className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> SSRF Protected</div>
+                <div className="flex items-center gap-1.5"><Globe className="w-3 h-3" /> HTTP/HTTPS Only</div>
+                <div className="flex items-center gap-1.5"><Activity className="w-3 h-3" /> Read-Only Probes</div>
+              </div>
+              {url.toLowerCase().includes("amazon.in") ? (
+                <div className="flex items-center gap-1.5 text-brand bg-brand/10 px-2 py-1 rounded uppercase tracking-wider font-bold">
+                  Mode: SIMULATED DEMO
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-status-blue bg-status-blue/10 px-2 py-1 rounded uppercase tracking-wider font-bold">
+                  Mode: LIVE CONNECTOR
+                </div>
+              )}
             </div>
           </Card>
         </form>
@@ -145,7 +156,19 @@ export default function ConnectApplicationPage() {
             <Card className="p-6 bg-surface/50 border-surface-elevated">
               <div className="flex items-start justify-between mb-8">
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-2">{result.application_url}</h2>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h2 className="text-xl font-bold text-white">{result.application_url}</h2>
+                    {result.error_message === "SIMULATED LIVE DEMO" && (
+                      <span className="bg-brand/20 text-brand text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border border-brand/30">
+                        DEMO RECORD
+                      </span>
+                    )}
+                  </div>
+                  {result.error_message === "SIMULATED LIVE DEMO" && (
+                    <div className="text-xs text-brand/80 font-mono mb-2 uppercase">
+                      AMAZON DEMO TARGET — SIMULATED LIVE OBSERVATION
+                    </div>
+                  )}
                   <div className={`flex items-center gap-2 font-mono text-sm ${statusColor}`}>
                     <StatusIcon className="w-4 h-4" />
                     {result.status === "HEALTHY" ? "HEALTHY — NO DEGRADATION DETECTED" : result.status}
@@ -179,7 +202,12 @@ export default function ConnectApplicationPage() {
                 <DisplayValue label="Error Rate" value={result.error_rate !== null ? `${(result.error_rate * 100).toFixed(1)}%` : "N/A"} />
               </div>
 
-              {result.error_message && (
+              {result.error_message === "SIMULATED LIVE DEMO" ? (
+                <div className="p-3 bg-brand/10 border border-brand/20 rounded text-sm text-brand flex items-start gap-2">
+                  <Activity className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <p><strong>Presentation fixture:</strong> values are simulated for demonstration. This will run the offline Demo Live Investigation.</p>
+                </div>
+              ) : result.error_message && (
                 <div className="p-3 bg-surface border border-surface-elevated rounded text-sm text-text-secondary">
                   <strong>Error:</strong> {result.error_message}
                 </div>

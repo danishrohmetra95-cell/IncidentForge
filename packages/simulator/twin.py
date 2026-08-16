@@ -80,6 +80,13 @@ class DigitalTwin:
             self.db_query_cost_ms = fault_config.get("query_cost_ms", 60.0)
             self.active_connections = int(self.db_pool_size * 0.35)
 
+        elif self._fault_type == "upstream_latency":
+            self.request_rate = fault_config.get("request_rate", 1000.0)
+            self.active_connections = int(self.db_pool_size * 0.3)
+            self.cache_hit_rate = 0.95
+            self._p95_latency = 875.0
+            self._error_rate = 0.008
+
         # Run a few ticks to stabilize derived metrics
         self.tick(steps=5)
 
@@ -150,6 +157,13 @@ class DigitalTwin:
             if self.cpu_load > 0.7:
                 cpu_latency = (self.cpu_load - 0.7) * 500.0
 
+            if self._fault_type == "upstream_latency":
+                self._p50_latency = 210.0
+                self._p95_latency = 875.0
+                self._p99_latency = 1240.0
+                self._error_rate = 0.008
+                continue
+
             self._p50_latency = self.base_latency_ms + query_latency * 0.5 + cpu_latency * 0.3
             self._p95_latency = (
                 self.base_latency_ms + query_latency + wait_time + db_saturation_wait + cpu_latency
@@ -198,6 +212,12 @@ class DigitalTwin:
             self.deployment_version = params.get("target_version", "v1.7")
             if self._fault_type == "query_regression":
                 self.db_query_cost_ms = 15.0
+                self._fault_type = None
+
+        elif intervention_type == "upstream_latency_mitigation":
+            if self._fault_type == "upstream_latency":
+                self._base_p50_latency = 120
+                self._error_rate_base = 0.001
                 self._fault_type = None
             elif self._fault_type == "connection_leak":
                 self._fault_params["leak_rate"] = 0
