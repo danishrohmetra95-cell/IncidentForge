@@ -46,8 +46,6 @@ def get_gateway() -> ModelGateway:
     global _gateway
     if _gateway is None:
         _gateway = ModelGateway(
-            api_key=settings.FEATHERLESS_API_KEY,
-            base_url=settings.FEATHERLESS_BASE_URL,
             timeout=settings.MODEL_TIMEOUT_SECONDS,
         )
     return _gateway
@@ -78,6 +76,8 @@ async def build_orchestrator(incident_id: str):
     additional listeners if needed.
     """
     gateway = get_gateway()
+    deterministic_agents = DeterministicScenarioAgents() if settings.DEMO_MODE else None
+
     if gateway.is_configured:
         router = await get_router()
         triage = TriageAgent(gateway, router)
@@ -87,7 +87,6 @@ async def build_orchestrator(incident_id: str):
         designer = ExperimentDesigner(gateway, router)
         remediation = RemediationAgent(gateway, router)
     elif settings.DEMO_MODE:
-        deterministic_agents = DeterministicScenarioAgents()
         triage = evidence = hypothesis = critic = designer = remediation = deterministic_agents
     else:
         raise RuntimeError(
@@ -128,6 +127,7 @@ async def build_orchestrator(incident_id: str):
         memory_store=memory_store,
         fingerprinter=fingerprinter,
         event_listeners=[event_listener],
+        fallback_agents=deterministic_agents if gateway.is_configured else None,
     )
 
     return orchestrator, event_listener

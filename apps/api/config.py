@@ -1,7 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    GEMINI_API_KEY: str = ""
     FEATHERLESS_API_KEY: str = ""
+    XAI_API_KEY: str = ""
     FEATHERLESS_BASE_URL: str = "https://api.featherless.ai/v1"
     MODEL_TIMEOUT_SECONDS: float = 60.0
     DATABASE_URL: str = "postgresql+asyncpg://incidentforge:incidentforge@localhost:5432/incidentforge"

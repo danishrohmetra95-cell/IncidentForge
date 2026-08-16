@@ -34,12 +34,22 @@ app.include_router(hypotheses.router)
 @app.get("/api/health")
 async def health_check():
     from apps.api.persistence.repository import get_repository
+    from apps.api.services import get_gateway
+    from apps.api.config import settings
 
+    gateway = get_gateway()
     persistence = await get_repository().health_status()
+    
+    # Check live provider reachability if configured
+    provider_available = await gateway.health_check() if gateway.is_configured else False
+    
     return {
         "status": "ok",
-        "reasoning_mode": "live_model" if settings.FEATHERLESS_API_KEY else "deterministic_demo",
-        "featherless_configured": bool(settings.FEATHERLESS_API_KEY),
+        "reasoning_mode": "live_model" if provider_available else "deterministic_demo",
+        "live_reasoning_configured": gateway.is_configured,
+        "active_provider": gateway.active_provider_name if gateway.is_configured and provider_available else None,
+        "deterministic_fallback_available": settings.DEMO_MODE,
+        "provider_availability": provider_available,
         "simulation_only": True,
         **persistence,
     }

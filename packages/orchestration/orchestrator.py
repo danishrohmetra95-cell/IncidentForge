@@ -134,6 +134,8 @@ class InvestigationOrchestrator:
         fingerprinter: Any | None = None,
         # Event system
         event_listeners: list[EventListener] | None = None,
+        # Fallback agents
+        fallback_agents: Any | None = None,
     ):
         self._triage = triage_agent
         self._evidence = evidence_analyst
@@ -149,6 +151,7 @@ class InvestigationOrchestrator:
         self._memory = memory_store
         self._fingerprinter = fingerprinter
         self._listeners: list[EventListener] = event_listeners or []
+        self._fallback_agents = fallback_agents
 
     def add_listener(self, listener: EventListener) -> None:
         self._listeners.append(listener)
@@ -173,7 +176,7 @@ class InvestigationOrchestrator:
         ctx.timeline.append(entry)
 
     async def _run_agent(self, ctx: InvestigationContext, agent_name: str,
-                         model_name: str, coro: Any) -> Any:
+                         model_name: str, coro: Any, fallback_func: Any = None) -> Any:
         """Execute an agent call and record telemetry."""
         run = AgentRun(
             agent=agent_name,
@@ -194,17 +197,25 @@ class InvestigationOrchestrator:
             # a repaired response. Deterministic agents produce typed
             # contracts directly and therefore validate cleanly.
             run.output_validation_status = output_validation_status.get()
+            ctx.agent_runs.append(run)
+            return result
         except Exception as exc:
             elapsed_ms = int((time.monotonic() - start) * 1000)
             run.completed_at = now()
             run.latency_ms = elapsed_ms
+            
+            if fallback_func is not None:
+                logger.warning("Live reasoning failed (%s), falling back to deterministic mode for %s", exc, agent_name)
+                # Retry with fallback
+                run.status = "fallback"
+                ctx.agent_runs.append(run)
+                return await fallback_func()
+                
             run.status = "failed"
             run.error = str(exc)
             run.output_validation_status = "failed"
             ctx.agent_runs.append(run)
             raise
-        ctx.agent_runs.append(run)
-        return result
 
     async def run(self, incident: Incident, scenario_data: dict | None = None) -> InvestigationContext:
         """Execute the complete investigation lifecycle."""
@@ -236,6 +247,7 @@ class InvestigationOrchestrator:
             ctx.triage = await self._run_agent(
                 ctx, "triage", "fast_reasoning",
                 self._triage.analyze(triage_input),
+                fallback_func=lambda: self._fallback_agents.analyze(triage_input) if self._fallback_agents else None
             )
             ctx.incident.symptoms = ctx.triage.symptoms
             if ctx.triage.estimated_severity:
@@ -272,6 +284,7 @@ class InvestigationOrchestrator:
             evidence_output = await self._run_agent(
                 ctx, "evidence_analyst", "fast_reasoning",
                 self._evidence.analyze(evidence_input),
+                fallback_func=lambda: self._fallback_agents.analyze_evidence(evidence_input) if self._fallback_agents else None
             )
 
             for item in evidence_output.evidence:
@@ -338,6 +351,7 @@ class InvestigationOrchestrator:
             hyp_output = await self._run_agent(
                 ctx, "hypothesis_engine", "deep_reasoning",
                 self._hypothesis.generate(hyp_input),
+                fallback_func=lambda: self._fallback_agents.generate_hypotheses(hyp_input) if self._fallback_agents else None
             )
 
             ctx.hypotheses = []
@@ -385,6 +399,7 @@ class InvestigationOrchestrator:
             critique_output = await self._run_agent(
                 ctx, "adversarial_critic", "deep_reasoning",
                 self._critic.critique(critique_input),
+                fallback_func=lambda: self._fallback_agents.critique(critique_input) if self._fallback_agents else None
             )
             critique = Critique(
                 hypothesis_id=leading.id,
@@ -476,6 +491,7 @@ class InvestigationOrchestrator:
             design_output = await self._run_agent(
                 ctx, "experiment_designer", "deep_reasoning",
                 self._experiment_designer.design(design_input),
+                fallback_func=lambda: self._fallback_agents.design(design_input) if self._fallback_agents else None
             )
 
             experiment = Experiment(
@@ -656,6 +672,7 @@ class InvestigationOrchestrator:
             remediation_output = await self._run_agent(
                 ctx, "remediation", "deep_reasoning",
                 self._remediation.generate(remediation_input),
+                fallback_func=lambda: self._fallback_agents.generate_remediation(remediation_input) if self._fallback_agents else None
             )
             remediation = Remediation(
                 incident_id=incident.id,
