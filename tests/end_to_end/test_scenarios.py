@@ -31,3 +31,13 @@ def test_full_investigation_lifecycle_is_verified_and_resolved(scenario_id: str,
     assert context.verifications[-1].outcome == VerificationOutcome.VERIFIED
     assert context.remediation is not None
     assert context.remediation.validation_status == "validated"
+
+    # Regression check: verified hypothesis must be the highest scoring
+    from packages.contracts.domain import HypothesisStatus
+    verified_hyp = next(h for h in context.hypotheses if h.status == HypothesisStatus.VERIFIED)
+    other_hyps = [h for h in context.hypotheses if h.id != verified_hyp.id]
+    for other in other_hyps:
+        assert verified_hyp.score > other.score
+
+    # Assert that the resolved confidence does not remain 0.333
+    assert verified_hyp.score > 0.333

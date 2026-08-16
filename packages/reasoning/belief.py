@@ -84,8 +84,8 @@ class BeliefUpdateEngine:
             if historical_matches and historical_matches.get(h.id):
                 score += self.HISTORICAL_BONUS
 
-            # Clamp to [0.01, 0.99]
-            raw_scores[h.id] = max(0.01, min(0.99, score))
+            # Ensure raw score is positive before normalization
+            raw_scores[h.id] = max(0.01, score)
 
         # Normalize so scores sum to 1.0
         total = sum(raw_scores.values())
