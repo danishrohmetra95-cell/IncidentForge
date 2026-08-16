@@ -148,18 +148,29 @@ export default function ConnectApplicationPage() {
                   <h2 className="text-xl font-bold text-white mb-2">{result.application_url}</h2>
                   <div className={`flex items-center gap-2 font-mono text-sm ${statusColor}`}>
                     <StatusIcon className="w-4 h-4" />
-                    {result.status}
+                    {result.status === "HEALTHY" ? "HEALTHY — NO DEGRADATION DETECTED" : result.status}
                   </div>
                 </div>
-                <button
-                  onClick={handleCreateIncident}
-                  disabled={creating}
-                  className="bg-surface border border-surface-elevated hover:bg-surface-elevated text-white px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  {creating ? "Creating..." : "Create Investigation"}
-                </button>
+                {result.status !== "HEALTHY" && (
+                  <button
+                    onClick={handleCreateIncident}
+                    disabled={creating}
+                    className="bg-surface border border-surface-elevated hover:bg-surface-elevated text-white px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {creating ? "Creating..." : "Create Investigation"}
+                  </button>
+                )}
               </div>
+
+              {result.status === "HEALTHY" && (
+                <div className="mb-6 p-4 bg-status-green/5 border border-status-green/20 rounded-md">
+                  <p className="text-sm text-status-green font-medium">External telemetry does not indicate an incident.</p>
+                  <p className="text-[12px] text-text-secondary mt-1">
+                    The application is responding normally. No causal AI investigation is required.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <DisplayValue label="HTTP Status" value={result.http_status ? String(result.http_status) : "N/A"} />

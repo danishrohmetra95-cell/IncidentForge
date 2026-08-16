@@ -30,6 +30,7 @@ TRANSITIONS: dict[InvestigationState, set[InvestigationState]] = {
     },
     InvestigationState.HYPOTHESIS_GENERATION: {
         InvestigationState.HYPOTHESIS_CRITIQUE,
+        InvestigationState.RESOLVED,
         InvestigationState.FAILED,
     },
     InvestigationState.HYPOTHESIS_CRITIQUE: {

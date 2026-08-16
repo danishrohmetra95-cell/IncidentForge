@@ -134,9 +134,13 @@ class DeterministicScenarioAgents:
         return await self.generate_hypotheses(input_data)
 
     async def generate_hypotheses(self, input_data: HypothesisGenerationInput) -> HypothesisGenerationOutput:
+        print("EVIDENCE SOURCES:", [e.source for e in input_data.evidence])
         is_live = any("ApplicationConnector" in e.source for e in input_data.evidence)
         if is_live:
-            return HypothesisGenerationOutput(hypotheses=[])
+            return HypothesisGenerationOutput(
+                hypotheses=[],
+                rationale="No causal hypothesis could be established from external HTTP telemetry alone."
+            )
             
         text = " ".join(e.observation.lower() for e in input_data.evidence)
         cache_leads = "cache hit rate measured at 0.15" in text or "cache invalidation" in text

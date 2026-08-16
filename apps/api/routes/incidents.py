@@ -318,14 +318,15 @@ async def _run_investigation(incident_id: str) -> None:
         return
     scenario_data = load_scenario(incident.scenario_id) if incident.scenario_id else {}
 
-    ctx = None
     try:
         # Only override reasoning_mode for deterministic incidents, preserve live_model for live apps
         if incident.scenario_id:
             incident.reasoning_mode = "live_model" if get_gateway().is_configured else "deterministic_demo"
             
         orchestrator, event_bus = await build_orchestrator(incident_id)
-        ctx = await orchestrator.run(incident, scenario_data)
+        
+        initial_ctx = repo._contexts.get(incident_id)
+        ctx = await orchestrator.run(incident, scenario_data, initial_context=initial_ctx)
         await repo.save_context(ctx)
     except Exception as exc:
         logger.error("Investigation failed for %s: %s", incident_id, exc, exc_info=True)

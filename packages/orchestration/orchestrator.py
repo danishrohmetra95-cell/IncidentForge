@@ -217,9 +217,9 @@ class InvestigationOrchestrator:
             ctx.agent_runs.append(run)
             raise
 
-    async def run(self, incident: Incident, scenario_data: dict | None = None) -> InvestigationContext:
+    async def run(self, incident: Incident, scenario_data: dict | None = None, initial_context: InvestigationContext | None = None) -> InvestigationContext:
         """Execute the complete investigation lifecycle."""
-        ctx = InvestigationContext(incident)
+        ctx = initial_context or InvestigationContext(incident)
         scenario = scenario_data or {}
 
         try:

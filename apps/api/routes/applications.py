@@ -40,7 +40,7 @@ async def create_incident(
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
         
-    status = InvestigationState.RESOLVED if observation.status == "HEALTHY" else InvestigationState.CREATED
+    status = InvestigationState.RESOLVED if observation.status.value == "HEALTHY" else InvestigationState.CREATED
 
     incident = Incident(
         title=f"Application Incident: {observation.application_url}",
