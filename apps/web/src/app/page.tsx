@@ -265,7 +265,7 @@ export default function Home() {
                   
                   {/* Integrated React Flow & Telemetry */}
                   <div className="flex-1 flex flex-col p-4 gap-6">
-                    <div className="h-[280px] w-full rounded border border-surface-elevated/30 bg-[#0b0e14] relative shadow-inner [&_.react-flow__handle]:hidden [&_.react-flow__node]:!cursor-default [&_.react-flow__node.selected]:!shadow-none [&_.react-flow__node:focus]:!outline-none">
+                    <div className="h-[280px] w-full rounded border border-surface-elevated/30 bg-[#0b0e14] relative shadow-inner">
                       <ReactFlow 
                         nodes={flowNodes} 
                         edges={flowEdges} 
@@ -276,6 +276,9 @@ export default function Home() {
                         nodesDraggable={false}
                         nodesConnectable={false}
                         elementsSelectable={false}
+                        nodesFocusable={false}
+                        edgesFocusable={false}
+                        edgesReconnectable={false}
                       >
                         <Background color="#2a3241" gap={12} size={1} />
                       </ReactFlow>

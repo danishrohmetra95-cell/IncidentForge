@@ -142,7 +142,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
                 <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr] items-stretch">
                   <Card className="h-full min-h-[320px] overflow-hidden p-0 relative border-surface-elevated flex flex-col">
                     <div className="absolute top-3 left-3 z-10 font-mono text-[9px] uppercase tracking-wider text-text-secondary bg-background/80 px-2 py-1 rounded">Reasoning Graph</div>
-                    <div className="flex-1 w-full h-full relative [&_.react-flow__handle]:hidden [&_.react-flow__node]:!cursor-default [&_.react-flow__node.selected]:!shadow-none [&_.react-flow__node:focus]:!outline-none">
+                    <div className="flex-1 w-full h-full relative">
                       <ReactFlow 
                         nodes={flowNodes} 
                         edges={flowEdges} 
@@ -151,6 +151,9 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
                         nodesDraggable={false}
                         nodesConnectable={false}
                         elementsSelectable={false}
+                        nodesFocusable={false}
+                        edgesFocusable={false}
+                        edgesReconnectable={false}
                       >
                         <Background color="#2a3241" gap={16} size={1} />
                         <Controls showInteractive={false} className="opacity-50" />

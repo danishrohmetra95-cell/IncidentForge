@@ -29,3 +29,36 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-text-secondary;
 }
+
+/* React Flow Presentation Overrides */
+.react-flow__handle {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.react-flow__panel.react-flow__attribution {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 2px !important;
+  opacity: 0.3 !important;
+}
+
+.react-flow__panel.react-flow__attribution a {
+  color: #a0aabf !important;
+  text-decoration: none !important;
+  font-size: 10px !important;
+}
+
+.react-flow__node {
+  cursor: default !important;
+}
+
+.react-flow__node:focus,
+.react-flow__node:focus-visible {
+  outline: none !important;
+}
