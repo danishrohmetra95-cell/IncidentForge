@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Beaker, ChevronDown, ChevronUp, Database, FileSearch, GitBranch, Network, ShieldCheck, Server, AlertTriangle, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
+import { Activity, Beaker, ChevronDown, ChevronUp, Database, FileSearch, GitBranch, Network, ShieldCheck, Server, AlertTriangle, ArrowRight, CheckCircle2, XCircle, FlaskConical, Play, Target } from "lucide-react";
+import { ReactFlow, Background, Controls, Node, Edge } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 import { api } from "@/lib/api";
 import { IncidentDetail, TelemetrySnapshot } from "@/lib/types";
@@ -18,10 +20,22 @@ const metricCards: Array<{ key: keyof TelemetrySnapshot; label: string; format: 
   { key: "cpu", label: "CPU", format: (value) => `${(value * 100).toFixed(1)}%` },
 ];
 
+const parseLiveEvidence = (text: string) => {
+  const data: Record<string, string> = {};
+  text.split('\n').forEach(line => {
+    const [key, ...rest] = line.split(':');
+    if (key && rest.length > 0) {
+      data[key.trim()] = rest.join(':').trim();
+    }
+  });
+  return data;
+};
+
 export default function IncidentCommandCenter({ params }: { params: { id: string } }) {
   const [incident, setIncident] = useState<IncidentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const [activeAction, setActiveAction] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -34,11 +48,21 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
 
   useEffect(() => { 
     void refresh(); 
-    const es = api.subscribeToEvents(params.id, () => {
-      void refresh();
-    });
+    const es = api.subscribeToEvents(params.id, () => void refresh());
     return () => es.close();
   }, [params.id, refresh]);
+
+  const runAction = async (actionName: string, actionFn: () => Promise<any>) => {
+    setActiveAction(actionName);
+    try {
+      await actionFn();
+      await refresh();
+    } catch (err: any) {
+      setError(err.message || "Action failed");
+    } finally {
+      setActiveAction(null);
+    }
+  };
 
   if (error) return <main className="p-8 text-sm text-status-red flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{error}</main>;
   if (!incident) return (
@@ -50,62 +74,121 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
     </main>
   );
 
-  const observation = incident.observations.at(-1);
-  const verification = incident.verifications.at(-1);
+  const isLiveMode = incident.reasoning_mode === "live_model";
+  const liveEvidenceItem = incident.evidence.find(e => e.source === "ApplicationConnector");
+  const parsedLive = liveEvidenceItem ? parseLiveEvidence(liveEvidenceItem.observation) : null;
+
+  const observation = incident.observations?.at(-1);
   const currentMetrics = observation?.post_intervention ?? observation?.baseline;
   const baselineMetrics = observation?.baseline;
-  const experiment = incident.experiments.at(-1);
+
+  const hasMetrics = !!currentMetrics;
+  
+  const sortedHypotheses = [...(incident.hypotheses || [])].sort((a, b) => b.score - a.score);
+  const leadingHypothesis = sortedHypotheses[0];
+  const critic = leadingHypothesis ? incident.critiques?.find(c => c.hypothesis_id === leadingHypothesis.id) : null;
+  const experiment = leadingHypothesis ? incident.experiments?.find(e => e.target_hypothesis === leadingHypothesis.id) : null;
+  const verification = experiment ? incident.verifications?.find(v => v.experiment_id === experiment.id) : null;
   const remediation = incident.remediation;
-  const critic = incident.critiques?.at(-1);
+
+  // React Flow logic
+  let flowNodes: Node[] = [];
+  let flowEdges: Edge[] = [];
+  if (experiment) {
+    flowNodes = [
+      { id: 'hyp', type: 'default', position: { x: 50, y: 50 }, draggable: false, connectable: false, selectable: false, data: { label: 'Hypothesis' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#a0aabf', border: '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px' } },
+      { id: 'crit', type: 'default', position: { x: 50, y: 130 }, draggable: false, connectable: false, selectable: false, data: { label: 'Critic' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#d08770', border: '1px solid rgba(208, 135, 112, 0.4)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px' } },
+      { id: 'intv', type: 'default', position: { x: 250, y: 50 }, draggable: false, connectable: false, selectable: false, data: { label: 'Intervention' }, style: { background: 'rgba(232, 169, 21, 0.1)', color: '#e8a915', border: '1px solid rgba(232, 169, 21, 0.3)', fontWeight: 'bold', borderRadius: '8px', fontSize: '11px', padding: '8px 12px' } },
+      { id: 'verif', type: 'default', position: { x: 250, y: 160 }, draggable: false, connectable: false, selectable: false, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? 'rgba(163, 190, 140, 0.15)' : 'rgba(42, 50, 65, 0.9)', color: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#fff', border: verification?.outcome === 'VERIFIED' ? '1px solid rgba(163, 190, 140, 0.4)' : '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px' } }
+    ];
+    flowEdges = [
+      { id: 'e1', source: 'hyp', target: 'crit', animated: true, style: { stroke: 'rgba(208, 135, 112, 0.6)', strokeWidth: 1.5 } },
+      { id: 'e2', source: 'hyp', target: 'intv', style: { stroke: 'rgba(76, 86, 106, 0.8)', strokeWidth: 1.5 } },
+      { id: 'e3', source: 'intv', target: 'verif', animated: experiment.status === 'executed', style: { stroke: experiment.status === 'executed' ? 'rgba(232, 169, 21, 0.6)' : 'rgba(76, 86, 106, 0.8)', strokeWidth: 1.5 } }
+    ];
+  }
 
   const evidenceToShow = evidenceExpanded ? incident.evidence : incident.evidence.slice(0, 4);
-
-  // Sorting hypotheses
-  const sortedHypotheses = [...incident.hypotheses].sort((a, b) => b.score - a.score);
+  const healthStatusStr = parsedLive?.['Status']?.replace('HealthStatus.', '');
+  const isHealthy = isLiveMode && healthStatusStr === "HEALTHY";
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] p-6 lg:p-8 animate-in fade-in duration-300">
+    <main className="p-8 max-w-[1600px] mx-auto min-h-screen">
       
-      {/* Top Hero Card */}
-      <Card className="mb-6 p-5">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <SeverityBadge severity={incident.severity} />
-              <StatusBadge status={incident.status} />
-              <span className="font-mono text-[10px] uppercase text-text-secondary ml-1">
-                {incident.reasoning_mode === "live_model" ? "Live Mode" : "Deterministic Mode"}
-              </span>
+      {/* 1. HERO / INCIDENT HEADER */}
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-xl bg-surface/50 border border-surface-elevated p-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+          <Activity className="w-64 h-64" />
+        </div>
+        <div className="relative z-10 flex gap-6 w-full">
+          <div className="flex flex-col items-center justify-center min-w-[80px] pr-6 border-r border-surface-elevated/50">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 ${
+              incident.status === "RESOLVED" || isHealthy ? "bg-status-green/10 text-status-green border border-status-green/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]" : 
+              incident.severity === "SEV_1" || incident.severity === "SEV_2" ? "bg-status-red/10 text-status-red border border-status-red/20 shadow-[0_0_20px_rgba(239,68,68,0.1)]" :
+              "bg-status-amber/10 text-status-amber border border-status-amber/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+            }`}>
+              <Activity className="w-8 h-8 animate-pulse" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">{incident.title}</h1>
-            <div className="mt-2 flex items-center gap-3 font-mono text-[11px] text-text-secondary">
-              <span className="flex items-center gap-1"><Server className="h-3 w-3" />{incident.service}</span>
-              <span className="text-surface-elevated">•</span>
-              <span>ID: {incident.id}</span>
-            </div>
+            <SeverityBadge severity={incident.severity} />
           </div>
-          
-          <div className="flex flex-wrap items-start gap-2">
-            {experiment && (
-              <Link href={`/incidents/${incident.id}/experiment`} className="flex items-center gap-1.5 rounded bg-surface-elevated px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-surface-elevated/80 transition-colors">
-                <Beaker className="h-3.5 w-3.5 text-brand" /> Experiment Lab
-              </Link>
-            )}
-            {incident.experiments && incident.experiments.length > 0 && (
-              <Link href={`/incidents/${incident.id}/counterfactual`} className="flex items-center gap-1.5 rounded bg-surface-elevated px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-surface-elevated/80 transition-colors">
-                <GitBranch className="h-3.5 w-3.5 text-brand" /> Counterfactual
-              </Link>
-            )}
+
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary bg-background px-2 py-1 rounded border border-surface-elevated">
+                {incident.id}
+              </span>
+              {isLiveMode && (
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-brand bg-brand/10 px-2 py-1 rounded border border-brand/20">
+                  LIVE APPLICATION
+                </span>
+              )}
+              {isLiveMode && healthStatusStr && (
+                <span className={`font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${
+                  healthStatusStr === 'HEALTHY' ? 'bg-status-green/10 text-status-green border-status-green/20' : 
+                  healthStatusStr === 'UNAVAILABLE' ? 'bg-status-red/10 text-status-red border-status-red/20' : 'bg-status-amber/10 text-status-amber border-status-amber/20'
+                }`}>
+                  {healthStatusStr}
+                </span>
+              )}
+              {!isLiveMode && <StatusBadge status={incident.status} />}
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight mb-2 flex items-center gap-3">
+              {incident.title}
+            </h1>
+            <p className="text-sm text-text-secondary max-w-3xl leading-relaxed">
+              {incident.description}
+            </p>
           </div>
         </div>
-      </Card>
+      </header>
 
-      {/* Telemetry Row */}
-      {!currentMetrics ? (
-        <div className="mb-6 rounded border border-surface-elevated border-dashed p-4 text-center text-[12px] text-text-secondary">
+      {/* 2. LIVE TELEMETRY GRID */}
+      {isLiveMode && parsedLive ? (
+        <div className="mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Card className="p-3 bg-background/50 border-surface-elevated">
+             <DisplayValue label="HTTP Status" value={parsedLive['HTTP Status'] || 'N/A'} />
+          </Card>
+          <Card className="p-3 bg-background/50 border-surface-elevated">
+             <DisplayValue label="Availability" value={parsedLive['Availability'] || 'N/A'} />
+          </Card>
+          <Card className="p-3 bg-background/50 border-surface-elevated">
+             <DisplayValue label="P95 Latency" value={parsedLive['P95 Latency'] || 'N/A'} />
+          </Card>
+          <Card className="p-3 bg-background/50 border-surface-elevated">
+             <DisplayValue label="Error Rate" value={parsedLive['Error Rate'] || 'N/A'} />
+          </Card>
+          <Card className="p-3 bg-background/50 border-surface-elevated">
+             <DisplayValue label="TLS" value={parsedLive['TLS Valid'] === "True" ? "VALID" : parsedLive['TLS Valid'] === "False" ? "FAILED" : "N/A"} />
+          </Card>
+          <Card className="p-3 bg-background/50 border-surface-elevated">
+             <DisplayValue label="Observation Window" value="5s" />
+          </Card>
+        </div>
+      ) : !isLiveMode && !hasMetrics ? (
+        <div className="mb-6 flex h-32 items-center justify-center rounded-lg border border-dashed border-surface-elevated bg-surface/30 font-mono text-xs text-text-secondary">
           Awaiting telemetry snapshot...
         </div>
-      ) : (
+      ) : !isLiveMode && hasMetrics ? (
         <div className="mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {metricCards.map(({ key, label, format }) => {
             const current = currentMetrics[key];
@@ -124,69 +207,81 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
 
             return (
               <Card key={key} className="p-3 bg-background/50">
-                <DisplayValue 
-                  label={label} 
-                  value={format(current)} 
-                  delta={deltaStr} 
-                  isPositive={isPositive}
-                />
+                <DisplayValue label={label} value={format(current)} delta={deltaStr} isPositive={isPositive} />
               </Card>
             );
           })}
         </div>
-      )}
+      ) : null}
 
-      {/* Main 2-Column Layout */}
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+      {/* 3-COLUMN LAYOUT */}
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1.1fr_0.8fr]">
         
-        {/* LEFT COLUMN: Reasoning */}
+        {/* LEFT: AI REASONING ENGINE */}
         <div className="space-y-6">
-          
           <section>
             <SectionHeader title="Competing Hypotheses" icon={Network} />
-            <div className="grid gap-3">
-              {sortedHypotheses.map((hypothesis, index) => {
-                const isLeading = index === 0;
-                const isVerified = hypothesis.status === "VERIFIED";
-                const isRejected = hypothesis.status === "REJECTED";
-                
-                return (
-                  <Card key={hypothesis.id} className={`p-4 transition-all duration-300 ${isVerified ? 'border-status-green/30 bg-status-green/5 shadow-[0_0_12px_rgba(34,197,94,0.05)]' : isRejected ? 'opacity-60' : isLeading ? 'border-brand/30 bg-brand/5 shadow-[0_0_12px_rgba(245,158,11,0.05)]' : 'bg-background/30'}`}>
-                    <div className="flex items-start gap-3">
-                      <span className={`font-mono text-[11px] font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-secondary'}`}>
-                        #{index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <h2 className="text-[14px] font-semibold text-text-primary mb-2 leading-tight">{hypothesis.statement}</h2>
-                        <div className="flex items-center gap-3 font-mono text-[10px]">
-                          <div className="flex-1 h-1 bg-surface-elevated rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full ${isVerified ? 'bg-status-green' : isLeading ? 'bg-brand' : 'bg-text-secondary'}`} 
-                              style={{ width: `${Math.max(2, hypothesis.score * 100)}%` }} 
-                            />
+            
+            {sortedHypotheses.length === 0 ? (
+              <Card className="p-6 bg-background/30 border-dashed text-center flex flex-col items-center">
+                <Network className="h-8 w-8 text-text-secondary opacity-50 mb-3" />
+                <h3 className="text-sm font-bold text-white mb-1">AWAITING CAUSAL INVESTIGATION</h3>
+                <p className="text-[12px] text-text-secondary mb-4">
+                  {isLiveMode ? "Live telemetry has been collected. No causal hypotheses have been generated yet." : "No hypotheses have been proposed for this incident yet."}
+                </p>
+                {incident.status === "CREATED" && (
+                  <button onClick={() => void runAction('start', () => api.startInvestigation(incident.id))} disabled={activeAction === 'start'} className="bg-brand text-background px-4 py-2 rounded text-sm font-bold hover:bg-brand/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+                    <Play className="w-4 h-4" />
+                    {activeAction === 'start' ? "Starting..." : "Start Investigation"}
+                  </button>
+                )}
+                {incident.status === "CREATED" && isLiveMode && (
+                  <p className="text-[10px] text-text-secondary mt-3">This creates an investigation from observed evidence. No causal root cause is assumed.</p>
+                )}
+              </Card>
+            ) : (
+              <div className="grid gap-3">
+                {sortedHypotheses.map((hypothesis, index) => {
+                  const isLeading = index === 0;
+                  const isVerified = hypothesis.status === "VERIFIED";
+                  const isRejected = hypothesis.status === "REJECTED";
+                  
+                  return (
+                    <Card key={hypothesis.id} className={`p-4 transition-all duration-300 ${isVerified ? 'border-status-green/30 bg-status-green/5 shadow-[0_0_12px_rgba(34,197,94,0.05)]' : isRejected ? 'opacity-60' : isLeading ? 'border-brand/30 bg-brand/5 shadow-[0_0_12px_rgba(245,158,11,0.05)]' : 'bg-background/30'}`}>
+                      <div className="flex items-start gap-3">
+                        <span className={`font-mono text-[11px] font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-secondary'}`}>
+                          #{index + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <h2 className="text-[14px] font-semibold text-text-primary mb-2 leading-tight">{hypothesis.statement}</h2>
+                          <div className="flex items-center gap-3 font-mono text-[10px]">
+                            <div className="flex-1 h-1 bg-surface-elevated rounded-full overflow-hidden">
+                              <div className={`h-full ${isVerified ? 'bg-status-green' : isLeading ? 'bg-brand' : 'bg-text-secondary'}`} style={{ width: `${Math.max(2, hypothesis.score * 100)}%` }} />
+                            </div>
+                            <span className={`w-8 text-right font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-primary'}`}>
+                              {Math.round(hypothesis.score * 100)}%
+                            </span>
+                            <span className="text-surface-elevated">?</span>
+                            <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${isVerified ? 'bg-status-green/20 text-status-green' : isRejected ? 'bg-status-red/20 text-status-red' : 'bg-surface-elevated text-text-secondary'}`}>
+                              {hypothesis.status}
+                            </span>
                           </div>
-                          <span className={`w-8 text-right font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-primary'}`}>
-                            {Math.round(hypothesis.score * 100)}%
-                          </span>
-                          <span className="text-surface-elevated">•</span>
-                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${isVerified ? 'bg-status-green/20 text-status-green' : isRejected ? 'bg-status-red/20 text-status-red' : 'bg-surface-elevated text-text-secondary'}`}>
-                            {hypothesis.status}
-                          </span>
                         </div>
                       </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
-          {critic && (
-            <section>
+          <section>
+            <SectionHeader title="Adversarial Critic" icon={ShieldCheck} />
+            {critic ? (
               <Card className="border-status-amber/20 bg-status-amber/5 p-4 flex gap-3">
                 <ShieldCheck className="h-4 w-4 text-status-amber shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-mono text-[10px] uppercase tracking-wider text-status-amber mb-1">Adversarial Critic</h4>
+                  <h4 className="font-mono text-[10px] uppercase tracking-wider text-status-amber mb-1">Objection</h4>
                   <p className="text-[13px] text-text-primary leading-relaxed mb-3">{critic.objections}</p>
                   <div className="border-l-2 border-status-amber/30 pl-3">
                     <span className="block font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-0.5">Falsification Criteria</span>
@@ -194,66 +289,175 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
                   </div>
                 </div>
               </Card>
-            </section>
-          )}
+            ) : (
+              <Card className="p-4 bg-background/30 border-dashed text-center flex flex-col items-center">
+                 <ShieldCheck className="h-6 w-6 text-text-secondary opacity-30 mb-2" />
+                 <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary">CRITIC PENDING</span>
+              </Card>
+            )}
+          </section>
 
-          {(verification || remediation) && (
+          {remediation && (
             <section>
-              <SectionHeader title="Verification & Resolution" icon={CheckCircle2} />
-              <div className="space-y-3">
-                {verification && (
-                  <Card className={`p-4 ${verification.outcome === 'VERIFIED' ? 'border-status-green/30 bg-status-green/5' : 'border-status-red/30 bg-status-red/5'}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {verification.outcome === 'VERIFIED' ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : <XCircle className="h-4 w-4 text-status-red" />}
-                      <span className="font-mono text-[11px] font-bold uppercase">{verification.outcome}</span>
-                    </div>
-                    <p className="text-[13px] text-text-primary mb-4">{verification.explanation}</p>
-                    
-                    {verification.conditions && verification.conditions.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {verification.conditions.map((cond, i) => (
-                          <div key={i} className="flex items-center justify-between rounded bg-background/50 px-2 py-1.5 border border-surface-elevated">
-                            <span className="font-mono text-[10px] text-text-secondary">{cond.metric}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[11px]">{cond.observed_value?.toFixed(1)}</span>
-                              {cond.passed ? <CheckCircle2 className="h-3 w-3 text-status-green" /> : <XCircle className="h-3 w-3 text-status-red" />}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Card>
-                )}
-
-                {remediation && (
-                  <Card className="p-4 border-status-blue/20 bg-status-blue/5">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-status-blue mb-1 block">Remediation Applied</span>
-                    <p className="text-[13px] font-medium text-white mb-3">{remediation.title}</p>
-                    {remediation.diff && <DiffBlock diff={remediation.diff} />}
-                  </Card>
-                )}
-              </div>
+              <SectionHeader title="Remediation" icon={GitBranch} />
+              <Card className="p-4 border-status-blue/20 bg-status-blue/5">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-status-blue mb-1 block">Remediation Generated</span>
+                <p className="text-[13px] font-medium text-white mb-3">{remediation.title}</p>
+                {remediation.diff && <DiffBlock diff={remediation.diff} />}
+              </Card>
             </section>
           )}
+        </div>
+
+        {/* CENTER: CAUSAL EXPERIMENT */}
+        <div className="space-y-6">
+          <section>
+            <SectionHeader title="Causal Experiment" icon={FlaskConical} />
+            {experiment ? (
+              <div className="space-y-3">
+                <Card className="h-[250px] overflow-hidden p-0 relative border-surface-elevated flex flex-col">
+                  <div className="flex-1 w-full h-full relative">
+                    <ReactFlow 
+                      nodes={flowNodes} 
+                      edges={flowEdges} 
+                      fitView 
+                      attributionPosition="bottom-right"
+                      nodesDraggable={false}
+                      nodesConnectable={false}
+                      elementsSelectable={false}
+                      nodesFocusable={false}
+                      edgesFocusable={false}
+                      edgesReconnectable={false}
+                    >
+                      <Background color="#2a3241" gap={16} size={1} />
+                      <Controls showInteractive={false} className="opacity-50" />
+                    </ReactFlow>
+                  </div>
+                </Card>
+                <Card className="p-4 bg-background/50">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-brand mb-2">Intervention</div>
+                  <div className="font-mono text-[11px] text-text-primary bg-surface p-2 rounded border border-surface-elevated">
+                    <span className="text-status-blue">{experiment.intervention.type}</span>: {experiment.intervention.target}
+                  </div>
+                </Card>
+              </div>
+            ) : (
+              <Card className="p-6 bg-background/30 border-dashed text-center flex flex-col items-center">
+                <FlaskConical className="h-8 w-8 text-text-secondary opacity-50 mb-3" />
+                <h3 className="text-sm font-bold text-white mb-1">CAUSAL EXPERIMENT</h3>
+                <p className="text-[12px] text-text-secondary">No controlled experiment has been designed yet.</p>
+                {isLiveMode && (
+                  <p className="text-[11px] text-status-amber mt-3 bg-status-amber/10 p-2 rounded border border-status-amber/20">External HTTP observations alone cannot establish an internal root cause.</p>
+                )}
+              </Card>
+            )}
+          </section>
+
+          <section>
+            <SectionHeader title="Verification & Resolution" icon={CheckCircle2} />
+            {verification ? (
+              <Card className={`p-4 ${verification.outcome === 'VERIFIED' ? 'border-status-green/30 bg-status-green/5' : verification.outcome === 'REJECTED' ? 'border-status-red/30 bg-status-red/5' : 'border-status-amber/30 bg-status-amber/5'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {verification.outcome === 'VERIFIED' ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : verification.outcome === 'REJECTED' ? <XCircle className="h-4 w-4 text-status-red" /> : <AlertTriangle className="h-4 w-4 text-status-amber" />}
+                  <span className={`font-mono text-[11px] font-bold uppercase ${verification.outcome === 'VERIFIED' ? 'text-status-green' : verification.outcome === 'REJECTED' ? 'text-status-red' : 'text-status-amber'}`}>{verification.outcome}</span>
+                </div>
+                <p className="text-[13px] text-text-primary mb-4">{verification.explanation}</p>
+                
+                {verification.conditions && verification.conditions.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2">
+                    {verification.conditions.map((cond, i) => (
+                      <div key={i} className="flex items-center justify-between rounded bg-background/50 px-3 py-2 border border-surface-elevated">
+                        <span className="font-mono text-[11px] text-text-secondary">{cond.metric}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-[12px] text-white">{cond.observed_value?.toFixed(1)}</span>
+                          {cond.passed ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : <XCircle className="h-4 w-4 text-status-red" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            ) : (
+              <Card className="p-4 bg-background/30 border-dashed text-center flex flex-col items-center">
+                 <Target className="h-6 w-6 text-text-secondary opacity-30 mb-2" />
+                 <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary">VERIFICATION PENDING</span>
+                 <p className="text-[11px] text-text-secondary mt-2">No causal experiment has been completed yet.</p>
+              </Card>
+            )}
+          </section>
+
+          <section>
+            <SectionHeader title="Counterfactual Analysis" icon={Activity} />
+            <Card className="p-4 bg-background/30 border-dashed text-center flex flex-col items-center">
+               <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary mb-1">COUNTERFACTUAL ANALYSIS</span>
+               <p className="text-[11px] text-text-secondary">Available after a validated intervention.</p>
+            </Card>
+          </section>
 
         </div>
 
-        {/* RIGHT COLUMN: Evidence & Timeline */}
+        {/* RIGHT: LIVE CONTEXT */}
         <div className="space-y-6">
+          
+          {isLiveMode && parsedLive && (
+             <section>
+                <SectionHeader title="Live Observation" icon={Activity} />
+                <Card className="p-4 bg-background/50 mb-3 border-status-blue/20">
+                   <div className="font-mono text-[10px] uppercase tracking-wider text-status-blue mb-3">Diagnostic Summary</div>
+                   <p className="text-[12px] text-white leading-relaxed mb-4">
+                     Application reachable. HTTP {parsedLive['HTTP Status']}. {parsedLive['Error Rate']} probe failures. P95 latency {parsedLive['P95 Latency']}. TLS {parsedLive['TLS Valid'] === 'True' ? 'valid' : 'invalid'}.
+                   </p>
+                   {healthStatusStr && (
+                     <div className="border-t border-surface-elevated pt-3 mt-3">
+                       <span className={`font-mono text-[11px] font-bold uppercase ${healthStatusStr === 'HEALTHY' ? 'text-status-green' : healthStatusStr === 'UNAVAILABLE' ? 'text-status-red' : 'text-status-amber'}`}>{healthStatusStr}</span>
+                       <p className="text-[11px] text-text-secondary mt-1">
+                         {healthStatusStr === 'HEALTHY' ? 'No active degradation detected during the observation window.' : 'Elevated degradation or errors were observed during the measurement window.'}
+                       </p>
+                     </div>
+                   )}
+                </Card>
+             </section>
+          )}
+
           <section>
             <SectionHeader title="Evidence Context" icon={FileSearch} />
             <div className="space-y-2">
-              {evidenceToShow.map((evidence) => (
-                <Card key={evidence.id} className="p-3 bg-background/50">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-brand">{evidence.type}</span>
-                    <span className="font-mono text-[9px] text-text-secondary">{Math.round(evidence.strength * 100)}% conf</span>
-                  </div>
-                  <p className="text-[12px] text-text-primary leading-snug">{evidence.observation}</p>
-                </Card>
-              ))}
+              {isLiveMode && parsedLive ? (
+                <>
+                  <Card className="p-3 bg-background/50 flex justify-between items-center">
+                    <span className="font-mono text-[9px] uppercase text-text-secondary">METRIC <br/><span className="text-white text-[11px]">HTTP status</span></span>
+                    <span className="font-mono text-[12px] text-brand">{parsedLive['HTTP Status']}</span>
+                  </Card>
+                  <Card className="p-3 bg-background/50 flex justify-between items-center">
+                    <span className="font-mono text-[9px] uppercase text-text-secondary">METRIC <br/><span className="text-white text-[11px]">Availability</span></span>
+                    <span className="font-mono text-[12px] text-brand">{parsedLive['Availability']}</span>
+                  </Card>
+                  <Card className="p-3 bg-background/50 flex justify-between items-center">
+                    <span className="font-mono text-[9px] uppercase text-text-secondary">METRIC <br/><span className="text-white text-[11px]">P95 latency</span></span>
+                    <span className="font-mono text-[12px] text-brand">{parsedLive['P95 Latency']}</span>
+                  </Card>
+                  <Card className="p-3 bg-background/50 flex justify-between items-center">
+                    <span className="font-mono text-[9px] uppercase text-text-secondary">METRIC <br/><span className="text-white text-[11px]">Error rate</span></span>
+                    <span className="font-mono text-[12px] text-brand">{parsedLive['Error Rate']}</span>
+                  </Card>
+                  <Card className="p-3 bg-background/50 flex justify-between items-center">
+                    <span className="font-mono text-[9px] uppercase text-text-secondary">SECURITY <br/><span className="text-white text-[11px]">TLS status</span></span>
+                    <span className="font-mono text-[12px] text-brand">{parsedLive['TLS Valid'] === 'True' ? 'Valid' : 'Failed'}</span>
+                  </Card>
+                </>
+              ) : (
+                evidenceToShow.map((evidence) => (
+                  <Card key={evidence.id} className="p-3 bg-background/50">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-brand">{evidence.type}</span>
+                      <span className="font-mono text-[9px] text-text-secondary">{Math.round(evidence.strength * 100)}% conf</span>
+                    </div>
+                    <p className="text-[12px] text-text-primary leading-snug">{evidence.observation}</p>
+                  </Card>
+                ))
+              )}
             </div>
-            {incident.evidence.length > 4 && (
+            {!isLiveMode && incident.evidence.length > 4 && (
               <button 
                 onClick={() => setEvidenceExpanded(!evidenceExpanded)} 
                 className="mt-2 w-full rounded border border-surface-elevated py-1.5 text-[11px] font-medium text-text-secondary hover:bg-surface-elevated/50 hover:text-white transition-colors"
@@ -264,18 +468,25 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
           </section>
 
           <section>
-            <SectionHeader title="Activity Feed" icon={Database} />
-            <Card className="p-3 bg-background/50">
-              <div className="space-y-3">
-                {incident.timeline.map((event) => (
-                  <div key={event.id} className="flex gap-3 text-[12px]">
-                    <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-                    <div>
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary block mb-0.5">{event.event_type}</span>
-                      <span className="text-text-primary">{event.title}</span>
+            <SectionHeader title="Activity Stream" icon={Database} />
+            <Card className="p-4 bg-background/50">
+              <div className="space-y-4">
+                {incident.timeline.length === 0 ? (
+                  <span className="text-[12px] text-text-secondary font-mono">No activity recorded.</span>
+                ) : (
+                  incident.timeline.map((event, idx) => (
+                    <div key={event.id} className="relative flex gap-4 text-[12px]">
+                      {idx !== incident.timeline.length - 1 && (
+                        <div className="absolute top-4 bottom-[-16px] left-[3px] w-[1px] bg-surface-elevated" />
+                      )}
+                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand relative z-10 ring-2 ring-background" />
+                      <div>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary block mb-0.5">{event.event_type}</span>
+                        <span className="text-text-primary">{event.title}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </Card>
           </section>
