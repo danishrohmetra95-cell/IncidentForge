@@ -2,262 +2,258 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, FlaskConical, ShieldCheck } from "lucide-react";
+import { ReactFlow, Background, Controls, Node, Edge } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ReactFlow, Controls, Background, MarkerType, Node, Edge } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { ArrowLeft, Beaker, CheckCircle2, ShieldAlert, FileText, FlaskConical, Target, Database } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { IncidentDetail } from "@/lib/types";
 import { VerificationBadge } from "@/components/Badges";
+import { Card, SectionHeader, DiffBlock } from "@/components/UI";
 
-function MetricValue({ value, metric }: { value: number; metric: string }) {
-  const percentage = ["error_rate", "db_utilization", "cache_hit_rate", "cpu", "memory"].includes(metric);
-  return <span className="font-mono">{percentage ? `${(value * 100).toFixed(1)}%` : value.toFixed(metric.includes("latency") ? 1 : 0)}</span>;
+function MetricValue({ metric, value }: { metric: string; value: number }) {
+  if (metric === "error_rate" || metric === "cache_hit_rate" || metric === "cpu" || metric === "db_utilization") return <span>{(value * 100).toFixed(1)}%</span>;
+  if (metric === "p95_latency") return <span>{value.toFixed(1)} ms</span>;
+  return <span>{value.toFixed(0)}</span>;
 }
 
 export default function ExperimentLab({ params }: { params: { id: string } }) {
   const [incident, setIncident] = useState<IncidentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
-  
-  const refresh = useCallback(async () => {
-    try { setIncident(await api.getIncident(params.id)); setError(null); }
-    catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Unable to load experiment."); }
-  }, [params.id]);
-  
-  useEffect(() => { 
-    void refresh(); 
-    const es = api.subscribeToEvents(params.id, () => void refresh());
-    return () => es.close();
-  }, [params.id, refresh]);
 
-  const runAction = async (action: string, operation: () => Promise<unknown>) => {
-    setActiveAction(action);
+  const loadData = useCallback(async () => {
     try {
-      await operation();
-      await refresh();
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Experiment action failed.");
-    } finally {
-      setActiveAction(null);
+      setIncident(await api.getIncident(params.id));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load incident.");
     }
+  }, [params.id]);
+
+  useEffect(() => {
+    void loadData();
+    const es = api.subscribeToEvents(params.id, () => void loadData());
+    return () => es.close();
+  }, [params.id, loadData]);
+
+  const runAction = async (key: string, fn: () => Promise<unknown>) => {
+    setActiveAction(key);
+    try { await fn(); await loadData(); }
+    catch (err) { alert(err instanceof Error ? err.message : "Action failed"); }
+    finally { setActiveAction(null); }
   };
 
-  if (error) return <main className="p-8 text-sm text-status-red">{error}</main>;
-  if (!incident) return <main className="p-8 font-mono text-sm text-text-secondary">Loading experiment artifacts…</main>;
-  
-  const experiments = incident.experiments;
-  if (experiments.length === 0) return <main className="p-8"><Link className="text-brand underline" href={`/incidents/${params.id}`}>Return to the command center</Link><p className="mt-4 text-text-secondary">No backend experiment has been designed yet.</p></main>;
+  if (error) return <main className="p-8 text-[13px] text-status-red flex items-center gap-2"><ShieldAlert className="h-4 w-4" />{error}</main>;
+  if (!incident) return (
+    <main className="flex h-[50vh] items-center justify-center p-8">
+      <div className="flex items-center gap-3 text-text-secondary">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        <span className="font-mono text-[11px] uppercase tracking-wider">Loading Experiment Lab...</span>
+      </div>
+    </main>
+  );
 
   return (
-    <main className="mx-auto max-w-7xl p-6 md:p-10">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-brand">IncidentForge / experiment lab</p>
-          <h1 className="mt-2 text-3xl font-bold">Causal experiment record</h1>
+    <main className="mx-auto w-full max-w-[1400px] p-6 lg:p-8 animate-in fade-in duration-300">
+      <header className="mb-6">
+        <div className="mb-4">
+          <Link href={`/incidents/${params.id}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-secondary hover:text-white transition-colors">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Command Center
+          </Link>
         </div>
-        <Link href={`/incidents/${params.id}`} className="text-sm text-brand hover:underline">Command center</Link>
-      </div>
+        <div className="flex items-center gap-2 mb-1">
+          <Beaker className="h-4 w-4 text-brand" />
+          <span className="font-mono text-[10px] uppercase tracking-wider text-brand">Digital Twin Operations</span>
+        </div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Experiment Lab</h1>
+      </header>
 
-      <div className="space-y-12">
-        {experiments.map((experiment, idx) => {
-          const target = incident.hypotheses.find((h) => h.id === experiment.target_hypothesis);
-          const critique = incident.critiques.find((c) => c.hypothesis_id === experiment.target_hypothesis);
-          const observation = incident.observations.find((o) => o.experiment_id === experiment.id);
-          const verification = incident.verifications.find((v) => v.experiment_id === experiment.id);
-          
-          const chartData = verification?.conditions.map(c => ({
-            name: c.metric,
-            Baseline: c.baseline_value,
-            Observed: c.observed_value
-          })) || [];
+      {!incident.experiments || incident.experiments.length === 0 ? (
+        <Card className="p-12 text-center text-[13px] text-text-secondary flex flex-col items-center">
+          <FlaskConical className="h-8 w-8 mb-3 opacity-50" />
+          No experiments have been designed for this incident yet.
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {incident.experiments.map((experiment, idx) => {
+            const target = incident.hypotheses.find(h => h.id === experiment.target_hypothesis);
+            const critique = incident.critiques?.find(c => c.hypothesis_id === experiment.target_hypothesis);
+            const observation = incident.observations.find(o => o.experiment_id === experiment.id);
+            const verification = incident.verifications.find(v => v.experiment_id === experiment.id);
 
-          const leadingHypothesis = target?.statement
-            ? target.statement.length > 60 ? target.statement.slice(0, 57) + '…' : target.statement
-            : 'HYPOTHESIS';
-          const criticLabel = critique ? `${critique.objections.length} objection${critique.objections.length !== 1 ? 's' : ''}` : 'CRITIC OBJECTION';
-          const interventionLabel = experiment.intervention.type || 'INTERVENTION';
-          const expectedLabel = `${experiment.expected_conditions.length} expected condition${experiment.expected_conditions.length !== 1 ? 's' : ''}`;
-          const baselineP95 = observation?.baseline?.p95_latency;
-          const beforeLabel = baselineP95 != null ? `P95: ${baselineP95.toFixed(1)} ms` : 'BEFORE METRICS';
-          const experimentLabel = experiment.status === 'validated' ? 'Ready to execute' : experiment.status;
-          const afterP95 = observation?.post_intervention?.p95_latency;
-          const afterLabel = afterP95 != null ? `P95: ${afterP95.toFixed(1)} ms` : 'AFTER METRICS';
-          const verificationOutcome = verification?.outcome;
-          const verificationLabel = verificationOutcome ?? 'VERIFICATION';
-          const confidenceLabel = target ? `${Math.round(target.score * 100)}%` : 'CONFIDENCE UPDATE';
+            const flowNodes: Node[] = [
+              { id: 'hyp', type: 'input', position: { x: 50, y: 50 }, data: { label: 'Hypothesis' }, style: { background: '#2a3241', color: '#fff', border: '1px solid #4c566a', borderRadius: '4px', fontSize: '12px' } },
+              { id: 'crit', position: { x: 50, y: 120 }, data: { label: 'Critic' }, style: { background: '#2a3241', color: '#d08770', border: '1px solid #d08770', borderRadius: '4px', fontSize: '12px' } },
+              { id: 'intv', position: { x: 250, y: 50 }, data: { label: 'Intervention' }, style: { background: '#e8a915', color: '#1c212b', border: 'none', fontWeight: 'bold', borderRadius: '4px', fontSize: '12px' } },
+              { id: 'verif', type: 'output', position: { x: 250, y: 150 }, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#2a3241', color: verification?.outcome === 'VERIFIED' ? '#1c212b' : '#fff', border: '1px solid #4c566a', borderRadius: '4px', fontSize: '12px' } }
+            ];
+            const flowEdges: Edge[] = [
+              { id: 'e1', source: 'hyp', target: 'crit', animated: true, style: { stroke: '#4c566a' } },
+              { id: 'e2', source: 'hyp', target: 'intv', style: { stroke: '#4c566a' } },
+              { id: 'e3', source: 'intv', target: 'verif', animated: experiment.status === 'executed', style: { stroke: '#4c566a' } }
+            ];
 
-          const defaultNodeStyle = { background: '#1c212b', color: '#fff', border: '1px solid #2a3241' };
-          const verificationNodeStyle = verificationOutcome === 'VERIFIED'
-            ? { background: '#166534', color: '#fff', border: '1px solid #22c55e' }
-            : verificationOutcome === 'REJECTED'
-              ? { background: '#991b1b', color: '#fff', border: '1px solid #ef4444' }
-              : verificationOutcome === 'INCONCLUSIVE'
-                ? { background: '#92400e', color: '#fff', border: '1px solid #f59e0b' }
-                : defaultNodeStyle;
+            const chartData = verification ? verification.conditions.map(c => ({
+              name: c.metric,
+              Baseline: c.baseline_value,
+              Observed: c.observed_value
+            })) : [];
 
-          const flowNodes: Node[] = [
-            { id: 'hyp', position: { x: 50, y: 50 }, data: { label: leadingHypothesis }, style: defaultNodeStyle },
-            { id: 'crit', position: { x: 300, y: 50 }, data: { label: criticLabel }, style: defaultNodeStyle },
-            { id: 'int', position: { x: 550, y: 50 }, data: { label: interventionLabel }, style: defaultNodeStyle },
-            { id: 'exp', position: { x: 50, y: 150 }, data: { label: expectedLabel }, style: defaultNodeStyle },
-            { id: 'bef', position: { x: 300, y: 150 }, data: { label: beforeLabel }, style: defaultNodeStyle },
-            { id: 'run', position: { x: 550, y: 150 }, data: { label: experimentLabel }, style: defaultNodeStyle },
-            { id: 'aft', position: { x: 50, y: 250 }, data: { label: afterLabel }, style: defaultNodeStyle },
-            { id: 'ver', position: { x: 300, y: 250 }, data: { label: verificationLabel }, style: verificationNodeStyle },
-            { id: 'conf', position: { x: 550, y: 250 }, data: { label: confidenceLabel }, style: defaultNodeStyle },
-          ];
-
-          const flowEdges: Edge[] = [
-            { id: 'e1', source: 'hyp', target: 'crit', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e2', source: 'crit', target: 'int', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e3', source: 'int', target: 'exp', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e4', source: 'exp', target: 'bef', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e5', source: 'bef', target: 'run', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e6', source: 'run', target: 'aft', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e7', source: 'aft', target: 'ver', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-            { id: 'e8', source: 'ver', target: 'conf', animated: true, style: { stroke: '#e8a915' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#e8a915' } },
-          ];
-
-          return (
-            <div key={experiment.id} className="border border-surface-elevated rounded-lg p-6 bg-surface/50 backdrop-blur-sm mb-10">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-xl font-bold">Experiment {idx + 1}: {experiment.intervention.type}</h2>
-                <div className="flex flex-wrap gap-2">
-                  {!critique && (
-                    <button
-                      onClick={() => void runAction(`challenge-${experiment.id}`, () => api.challengeHypothesis(experiment.target_hypothesis))}
-                      disabled={activeAction !== null}
-                      className="rounded border border-brand px-3 py-2 text-xs font-bold text-brand disabled:opacity-50"
-                    >
-                      {activeAction === `challenge-${experiment.id}` ? "Challenging…" : "Run critic"}
-                    </button>
-                  )}
-                  {experiment.status === "proposed" && (
-                    <button
-                      onClick={() => void runAction(`validate-${experiment.id}`, () => api.validateExperiment(experiment.id))}
-                      disabled={activeAction !== null}
-                      className="rounded border border-brand px-3 py-2 text-xs font-bold text-brand disabled:opacity-50"
-                    >
-                      {activeAction === `validate-${experiment.id}` ? "Validating…" : "Validate safety"}
-                    </button>
-                  )}
-                  {experiment.status === "validated" && (
-                    <button
-                      onClick={() => void runAction(`execute-${experiment.id}`, () => api.executeExperiment(experiment.id))}
-                      disabled={activeAction !== null}
-                      className="rounded bg-brand px-3 py-2 text-xs font-bold text-background disabled:opacity-50"
-                    >
-                      {activeAction === `execute-${experiment.id}` ? "Executing…" : "Execute in Digital Twin"}
-                    </button>
-                  )}
-                  {experiment.status === "rejected" && (
-                    <button
-                      onClick={() => void runAction(`redesign-${experiment.id}`, () => api.designExperiment(experiment.target_hypothesis))}
-                      disabled={activeAction !== null}
-                      className="rounded border border-brand px-3 py-2 text-xs font-bold text-brand disabled:opacity-50"
-                    >
-                      {activeAction === `redesign-${experiment.id}` ? "Designing…" : "Design replacement"}
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              <div className="h-80 w-full mb-8 border border-surface-elevated rounded">
-                <ReactFlow nodes={flowNodes} edges={flowEdges} fitView>
-                  <Background color="#2a3241" gap={16} />
-                  <Controls />
-                </ReactFlow>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-2 mb-8">
-                <article className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
-                  <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Hypothesis & Critiques</h3>
-                  <p className="mt-4 text-sm font-medium">{target?.statement}</p>
-                  {critique && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-xs text-brand font-mono">OBJECTIONS:</p>
-                      {critique.objections.map((obj, i) => <p key={i} className="text-sm text-text-secondary">- {obj}</p>)}
-                      <p className="text-xs text-brand font-mono mt-4">FALSIFICATION CRITERIA:</p>
-                      {critique.falsification_criteria.map((fc, i) => <p key={i} className="text-sm text-text-secondary">- {fc}</p>)}
+            return (
+              <div key={experiment.id} className="space-y-6">
+                
+                {/* Hero Card */}
+                <Card className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-surface-elevated">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-8 w-8 rounded bg-surface-elevated font-mono text-[12px] text-text-secondary font-bold">
+                      {idx + 1}
                     </div>
-                  )}
-                </article>
-                <article className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
-                  <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Prediction contract</h3>
-                  <div className="mt-4 space-y-3">
-                    {experiment.expected_conditions.map((condition) => (
-                      <div key={condition.metric} className="flex justify-between gap-4 rounded border border-surface-elevated p-3 text-sm">
-                        <span>{condition.metric}</span>
-                        <span className="font-mono text-brand">{condition.direction} ≥ {condition.threshold_percentage}%</span>
+                    <div>
+                      <h2 className="text-[15px] font-bold text-white">{experiment.intervention.type}</h2>
+                      <p className="text-[11px] font-mono text-text-secondary mt-0.5">Target: {experiment.target_hypothesis}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] uppercase text-text-secondary border border-surface-elevated px-2 py-1 rounded bg-background">
+                      {experiment.status}
+                    </span>
+                    {experiment.status === "designed" && (
+                      <button onClick={() => void runAction(`validate-${experiment.id}`, () => api.validateExperiment(experiment.id))} disabled={activeAction !== null} className="rounded bg-brand px-3 py-1.5 text-[11px] font-bold text-background hover:bg-brand/90 transition-colors disabled:opacity-50">
+                        {activeAction === `validate-${experiment.id}` ? "Validating..." : "Validate Safety"}
+                      </button>
+                    )}
+                    {experiment.status === "validated" && (
+                      <button onClick={() => void runAction(`execute-${experiment.id}`, () => api.executeExperiment(experiment.id))} disabled={activeAction !== null} className="rounded bg-brand px-3 py-1.5 text-[11px] font-bold text-background hover:bg-brand/90 transition-colors disabled:opacity-50">
+                        {activeAction === `execute-${experiment.id}` ? "Executing..." : "Execute in Digital Twin"}
+                      </button>
+                    )}
+                    {experiment.status === "rejected" && (
+                      <button onClick={() => void runAction(`redesign-${experiment.id}`, () => api.designExperiment(experiment.target_hypothesis))} disabled={activeAction !== null} className="rounded border border-surface-elevated px-3 py-1.5 text-[11px] font-bold text-text-primary hover:bg-surface-elevated/50 transition-colors disabled:opacity-50">
+                        {activeAction === `redesign-${experiment.id}` ? "Designing..." : "Design Replacement"}
+                      </button>
+                    )}
+                  </div>
+                </Card>
+
+                {/* 2-Column Reasoning Graph & Summary */}
+                <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+                  <Card className="h-[260px] overflow-hidden p-0 relative border-surface-elevated">
+                    <div className="absolute top-3 left-3 z-10 font-mono text-[9px] uppercase tracking-wider text-text-secondary bg-background/80 px-2 py-1 rounded">Reasoning Graph</div>
+                    <ReactFlow nodes={flowNodes} edges={flowEdges} fitView attributionPosition="bottom-left">
+                      <Background color="#2a3241" gap={16} size={1} />
+                      <Controls showInteractive={false} className="opacity-50" />
+                    </ReactFlow>
+                  </Card>
+                  
+                  <Card className="p-4 bg-background/50 border-surface-elevated flex flex-col">
+                    <SectionHeader title="Experiment Summary" icon={FileText} />
+                    <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+                      <div>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-1 block">Hypothesis</span>
+                        <p className="text-[12px] font-medium text-text-primary leading-snug">{target?.statement}</p>
                       </div>
-                    ))}
-                  </div>
-                </article>
-              </div>
-
-              {observation && verification && (
-                <div className="mb-8 space-y-8">
-                  <div className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
-                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                      <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Metrics Comparison (Bar Chart)</h3>
-                    </div>
-                    <div className="h-64 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#2a3241" />
-                          <XAxis dataKey="name" stroke="#a0aabf" fontSize={12} />
-                          <YAxis stroke="#a0aabf" fontSize={12} />
-                          <Tooltip contentStyle={{ backgroundColor: '#1c212b', borderColor: '#2a3241', color: '#fff' }} />
-                          <Legend />
-                          <Bar dataKey="Baseline" fill="#a0aabf" />
-                          <Bar dataKey="Observed" fill="#e8a915" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  <div className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
-                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                      <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Detailed Metrics Table</h3>
-                      <VerificationBadge result={verification.outcome} />
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[540px] text-left text-sm">
-                        <thead className="border-b border-surface-elevated font-mono text-xs uppercase text-text-secondary">
-                          <tr><th className="pb-3">Metric</th><th className="pb-3">Baseline</th><th className="pb-3">Observed</th><th className="pb-3">Expected</th><th className="pb-3">Result</th></tr>
-                        </thead>
-                        <tbody>
-                          {verification.conditions.map((condition) => (
-                            <tr key={condition.metric} className="border-b border-surface-elevated last:border-0">
-                              <td className="py-3 font-mono">{condition.metric}</td>
-                              <td className="py-3"><MetricValue metric={condition.metric} value={condition.baseline_value} /></td>
-                              <td className="py-3"><MetricValue metric={condition.metric} value={condition.observed_value} /></td>
-                              <td className="py-3 text-text-secondary">{condition.expected}</td>
-                              <td className={`py-3 font-mono text-xs ${condition.passed ? "text-status-green" : "text-status-red"}`}>{condition.passed ? "PASS" : "FAIL"}</td>
-                            </tr>
+                      <div>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-1 block">Falsification Check</span>
+                        <p className="text-[12px] text-text-primary leading-snug">{critique?.falsification_criteria[0] || "No criteria available"}</p>
+                      </div>
+                      <div>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-brand mb-1 block">Expected Conditions</span>
+                        <div className="space-y-1.5">
+                          {experiment.expected_conditions.map(cond => (
+                            <div key={cond.metric} className="flex justify-between items-center text-[11px] font-mono bg-surface px-2 py-1.5 rounded border border-surface-elevated">
+                              <span className="text-text-secondary">{cond.metric}</span>
+                              <span className="text-white">{cond.direction} {cond.threshold_percentage}%</span>
+                            </div>
                           ))}
-                        </tbody>
-                      </table>
+                        </div>
+                      </div>
                     </div>
-                    <p className="mt-5 text-sm text-text-secondary">{verification.explanation}</p>
-                  </div>
+                  </Card>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
 
-      {incident.remediation && (
-        <section className="mt-8 rounded border border-status-green/30 bg-status-green/5 p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-status-green">Remediation {incident.remediation.validation_status}</p>
-          <h2 className="mt-2 text-xl font-bold">{incident.remediation.title}</h2>
-          <p className="mt-2 text-sm text-text-secondary">{incident.remediation.description}</p>
-          {incident.remediation.diff && <pre className="mt-4 overflow-x-auto rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-4 text-xs text-text-secondary">{incident.remediation.diff}</pre>}
-          {incident.remediation.validation_detail && <p className="mt-4 text-sm text-status-green">{incident.remediation.validation_detail}</p>}
-        </section>
+                {/* Telemetry Charts */}
+                {observation && verification && (
+                  <div className="space-y-6">
+                    <Card className="p-4 bg-background/50 border-surface-elevated">
+                      <SectionHeader title="Before / After Telemetry" icon={Target} />
+                      <div className="h-[200px] w-full mt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#2a3241" vertical={false} />
+                            <XAxis dataKey="name" stroke="#a0aabf" fontSize={10} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#a0aabf" fontSize={10} tickLine={false} axisLine={false} width={40} />
+                            <Tooltip contentStyle={{ backgroundColor: '#1c212b', borderColor: '#2a3241', color: '#fff', fontSize: '11px', borderRadius: '4px' }} cursor={{fill: '#2a3241', opacity: 0.4}} />
+                            <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                            <Bar dataKey="Baseline" fill="#4c566a" radius={[2, 2, 0, 0]} maxBarSize={60} />
+                            <Bar dataKey="Observed" fill="#e8a915" radius={[2, 2, 0, 0]} maxBarSize={60} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+
+                    <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+                      <Card className="p-4 bg-background/50 border-surface-elevated">
+                        <div className="flex items-center justify-between mb-4">
+                          <SectionHeader title="Detailed Metrics" icon={Database} />
+                          <VerificationBadge result={verification.outcome} />
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-[12px]">
+                            <thead className="border-b border-surface-elevated font-mono text-[9px] uppercase text-text-secondary">
+                              <tr>
+                                <th className="pb-2 font-medium">Metric</th>
+                                <th className="pb-2 font-medium">Baseline</th>
+                                <th className="pb-2 font-medium">Observed</th>
+                                <th className="pb-2 font-medium">Expected</th>
+                                <th className="pb-2 font-medium">Result</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-elevated">
+                              {verification.conditions.map((condition) => (
+                                <tr key={condition.metric}>
+                                  <td className="py-2 font-mono text-text-primary">{condition.metric}</td>
+                                  <td className="py-2"><MetricValue metric={condition.metric} value={condition.baseline_value} /></td>
+                                  <td className="py-2"><MetricValue metric={condition.metric} value={condition.observed_value} /></td>
+                                  <td className="py-2 text-text-secondary font-mono text-[10px]">{condition.expected}</td>
+                                  <td className={`py-2 font-mono text-[10px] font-bold ${condition.passed ? "text-status-green" : "text-status-red"}`}>
+                                    {condition.passed ? "PASS" : "FAIL"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="mt-4 text-[12px] text-text-secondary leading-relaxed bg-surface p-2.5 rounded border border-surface-elevated">
+                          {verification.explanation}
+                        </p>
+                      </Card>
+
+                      {incident.remediation && (
+                        <Card className="p-4 border-status-green/30 bg-status-green/5">
+                          <SectionHeader title="Remediation Validated" icon={CheckCircle2} />
+                          <h3 className="text-[14px] font-bold text-white mb-1.5">{incident.remediation.title}</h3>
+                          <p className="text-[12px] text-text-secondary mb-4 leading-relaxed">{incident.remediation.description}</p>
+                          {incident.remediation.diff && (
+                            <div className="mb-4">
+                              <DiffBlock diff={incident.remediation.diff} />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 font-medium text-[11px] text-status-green">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {incident.remediation.validation_detail}
+                          </div>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </main>
   );

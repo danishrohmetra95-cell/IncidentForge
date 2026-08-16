@@ -43,9 +43,9 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
   if (error) return <main className="p-8 text-sm text-status-red flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{error}</main>;
   if (!incident) return (
     <main className="flex h-[50vh] items-center justify-center p-8">
-      <div className="flex flex-col items-center gap-4 text-text-secondary">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" />
-        <p className="font-mono text-sm uppercase tracking-wider">Synchronizing state...</p>
+      <div className="flex items-center gap-3 text-text-secondary">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        <span className="font-mono text-[11px] uppercase tracking-wider">Synchronizing state...</span>
       </div>
     </main>
   );
@@ -64,84 +64,116 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
   const sortedHypotheses = [...incident.hypotheses].sort((a, b) => b.score - a.score);
 
   return (
-    <main className="mx-auto max-w-7xl p-6 md:p-8 animate-in fade-in duration-500">
-      <header className="mb-8">
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-start">
-          <div className="flex-1">
-            <div className="mb-4 flex flex-wrap items-center gap-3">
+    <main className="mx-auto w-full max-w-[1400px] p-6 lg:p-8 animate-in fade-in duration-300">
+      
+      {/* Top Hero Card */}
+      <Card className="mb-6 p-5">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <SeverityBadge severity={incident.severity} />
               <StatusBadge status={incident.status} />
-              <span className="rounded-sm border border-brand/20 bg-brand/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-brand shadow-inner">
-                {incident.reasoning_mode === "live_model" ? "Live Model Reasoning" : "Deterministic Fallback"}
+              <span className="font-mono text-[10px] uppercase text-text-secondary ml-1">
+                {incident.reasoning_mode === "live_model" ? "Live Mode" : "Deterministic Mode"}
               </span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">{incident.title}</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-secondary">{incident.description}</p>
-            <div className="mt-4 flex items-center gap-4 font-mono text-xs text-text-secondary">
-              <span className="flex items-center gap-1.5"><Server className="h-3.5 w-3.5" />{incident.service}</span>
+            <h1 className="text-2xl font-bold text-white tracking-tight">{incident.title}</h1>
+            <div className="mt-2 flex items-center gap-3 font-mono text-[11px] text-text-secondary">
+              <span className="flex items-center gap-1"><Server className="h-3 w-3" />{incident.service}</span>
               <span className="text-surface-elevated">•</span>
               <span>ID: {incident.id}</span>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col gap-3">
+          
+          <div className="flex flex-wrap items-start gap-2">
             {experiment && (
-              <Link href={`/incidents/${incident.id}/experiment`} className="group flex items-center justify-center gap-2 rounded-md bg-surface-elevated px-4 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/10 transition-all hover:bg-surface-elevated/80">
-                <Beaker className="h-4 w-4 text-brand" />
-                Experiment Lab
-                <ArrowRight className="h-4 w-4 text-text-secondary transition-transform group-hover:translate-x-1" />
+              <Link href={`/incidents/${incident.id}/experiment`} className="flex items-center gap-1.5 rounded bg-surface-elevated px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-surface-elevated/80 transition-colors">
+                <Beaker className="h-3.5 w-3.5 text-brand" /> Experiment Lab
               </Link>
             )}
             {incident.experiments && incident.experiments.length > 0 && (
-              <Link href={`/incidents/${incident.id}/counterfactual`} className="group flex items-center justify-center gap-2 rounded-md bg-surface-elevated px-4 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/10 transition-all hover:bg-surface-elevated/80">
-                <GitBranch className="h-4 w-4 text-brand" />
-                Counterfactuals
-                <ArrowRight className="h-4 w-4 text-text-secondary transition-transform group-hover:translate-x-1" />
+              <Link href={`/incidents/${incident.id}/counterfactual`} className="flex items-center gap-1.5 rounded bg-surface-elevated px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-surface-elevated/80 transition-colors">
+                <GitBranch className="h-3.5 w-3.5 text-brand" /> Counterfactual
               </Link>
             )}
           </div>
         </div>
-      </header>
+      </Card>
 
-      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <div className="space-y-8">
+      {/* Telemetry Row */}
+      {!currentMetrics ? (
+        <div className="mb-6 rounded border border-surface-elevated border-dashed p-4 text-center text-[12px] text-text-secondary">
+          Awaiting telemetry snapshot...
+        </div>
+      ) : (
+        <div className="mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {metricCards.map(({ key, label, format }) => {
+            const current = currentMetrics[key];
+            const baseline = baselineMetrics?.[key];
+            let deltaStr;
+            let isPositive = false;
+            
+            if (baseline !== undefined && baseline !== 0) {
+              const diff = current - baseline;
+              const pct = (diff / baseline) * 100;
+              isPositive = (key === 'cache_hit_rate' ? diff > 0 : diff < 0);
+              if (Math.abs(pct) > 0.1) {
+                deltaStr = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+              }
+            }
+
+            return (
+              <Card key={key} className="p-3 bg-background/50">
+                <DisplayValue 
+                  label={label} 
+                  value={format(current)} 
+                  delta={deltaStr} 
+                  isPositive={isPositive}
+                />
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Main 2-Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        
+        {/* LEFT COLUMN: Reasoning */}
+        <div className="space-y-6">
           
-          {/* HYPOTHESES */}
           <section>
-            <SectionHeader title="Competing Hypotheses" icon={Network} description="Ranked causal proposals based on initial evidence and symptoms." />
-            <div className="grid gap-4">
+            <SectionHeader title="Competing Hypotheses" icon={Network} />
+            <div className="grid gap-3">
               {sortedHypotheses.map((hypothesis, index) => {
                 const isLeading = index === 0;
                 const isVerified = hypothesis.status === "VERIFIED";
                 const isRejected = hypothesis.status === "REJECTED";
+                
                 return (
-                  <Card key={hypothesis.id} className={`p-5 transition-all duration-300 ${isVerified ? 'border-status-green/50 bg-status-green/5' : isLeading ? 'border-brand/30 bg-brand/5 shadow-lg shadow-brand/5' : ''}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded bg-background font-mono text-sm font-bold shadow-inner ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-secondary'}`}>
-                          #{index + 1}
-                        </span>
-                        <div>
-                          <h2 className="text-base font-semibold text-white">{hypothesis.statement}</h2>
-                          <div className="mt-2 flex items-center gap-3 font-mono text-xs">
-                            <span className={`rounded-sm px-1.5 py-0.5 font-bold ${isVerified ? 'bg-status-green/20 text-status-green' : isRejected ? 'bg-status-red/20 text-status-red' : 'bg-surface-elevated text-text-secondary'}`}>
-                              {hypothesis.status}
-                            </span>
-                            <span className="text-text-secondary">•</span>
-                            <span className="text-text-secondary">{hypothesis.supporting_evidence.length} evidence sources</span>
+                  <Card key={hypothesis.id} className={`p-4 transition-all duration-300 ${isVerified ? 'border-status-green/30 bg-status-green/5 shadow-[0_0_12px_rgba(34,197,94,0.05)]' : isRejected ? 'opacity-60' : isLeading ? 'border-brand/30 bg-brand/5 shadow-[0_0_12px_rgba(245,158,11,0.05)]' : 'bg-background/30'}`}>
+                    <div className="flex items-start gap-3">
+                      <span className={`font-mono text-[11px] font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-secondary'}`}>
+                        #{index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-[14px] font-semibold text-text-primary mb-2 leading-tight">{hypothesis.statement}</h2>
+                        <div className="flex items-center gap-3 font-mono text-[10px]">
+                          <div className="flex-1 h-1 bg-surface-elevated rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${isVerified ? 'bg-status-green' : isLeading ? 'bg-brand' : 'bg-text-secondary'}`} 
+                              style={{ width: `${Math.max(2, hypothesis.score * 100)}%` }} 
+                            />
                           </div>
+                          <span className={`w-8 text-right font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-primary'}`}>
+                            {Math.round(hypothesis.score * 100)}%
+                          </span>
+                          <span className="text-surface-elevated">•</span>
+                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${isVerified ? 'bg-status-green/20 text-status-green' : isRejected ? 'bg-status-red/20 text-status-red' : 'bg-surface-elevated text-text-secondary'}`}>
+                            {hypothesis.status}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`font-mono text-xl font-bold ${isVerified ? 'text-status-green' : isLeading ? 'text-brand' : 'text-text-primary'}`}>
-                          {Math.round(hypothesis.score * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-background shadow-inner">
-                      <div 
-                        className={`h-full transition-all duration-1000 ease-out ${isVerified ? 'bg-status-green' : isLeading ? 'bg-brand' : 'bg-text-secondary'}`} 
-                        style={{ width: `${Math.max(2, hypothesis.score * 100)}%` }} 
-                      />
                     </div>
                   </Card>
                 );
@@ -149,55 +181,43 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
             </div>
           </section>
 
-          {/* CRITIC CHALLENGE */}
           {critic && (
-            <section className="relative">
-              <div className="absolute -left-[1.2rem] top-8 bottom-0 w-px bg-surface-elevated" />
-              <SectionHeader title="Adversarial Critic" icon={ShieldCheck} description="Automated falsification challenge to the leading hypothesis." />
-              <Card className="border-status-amber/20 bg-status-amber/5 p-6">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-mono text-[10px] uppercase tracking-wider text-status-amber mb-1">Objection</h4>
-                    <p className="text-sm text-text-primary leading-relaxed">{critic.objections}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-mono text-[10px] uppercase tracking-wider text-status-amber mb-1">Falsification Criteria</h4>
-                    <p className="text-sm font-medium text-text-primary leading-relaxed border-l-2 border-status-amber/50 pl-3 py-1 bg-status-amber/5">{critic.falsification_criteria}</p>
+            <section>
+              <Card className="border-status-amber/20 bg-status-amber/5 p-4 flex gap-3">
+                <ShieldCheck className="h-4 w-4 text-status-amber shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-mono text-[10px] uppercase tracking-wider text-status-amber mb-1">Adversarial Critic</h4>
+                  <p className="text-[13px] text-text-primary leading-relaxed mb-3">{critic.objections}</p>
+                  <div className="border-l-2 border-status-amber/30 pl-3">
+                    <span className="block font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-0.5">Falsification Criteria</span>
+                    <p className="text-[12px] text-text-primary">{critic.falsification_criteria}</p>
                   </div>
                 </div>
               </Card>
             </section>
           )}
 
-          {/* VERIFICATION & REMEDIATION */}
           {(verification || remediation) && (
             <section>
               <SectionHeader title="Verification & Resolution" icon={CheckCircle2} />
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {verification && (
-                  <Card className={`p-6 ${verification.outcome === 'VERIFIED' ? 'border-status-green/30 bg-status-green/5' : 'border-status-red/30 bg-status-red/5'}`}>
-                    <div className="mb-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {verification.outcome === 'VERIFIED' ? <CheckCircle2 className="h-6 w-6 text-status-green" /> : <XCircle className="h-6 w-6 text-status-red" />}
-                        <h3 className="text-lg font-bold text-white">{verification.outcome}</h3>
-                      </div>
+                  <Card className={`p-4 ${verification.outcome === 'VERIFIED' ? 'border-status-green/30 bg-status-green/5' : 'border-status-red/30 bg-status-red/5'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {verification.outcome === 'VERIFIED' ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : <XCircle className="h-4 w-4 text-status-red" />}
+                      <span className="font-mono text-[11px] font-bold uppercase">{verification.outcome}</span>
                     </div>
-                    <p className="text-sm text-text-primary mb-6 leading-relaxed">{verification.explanation}</p>
+                    <p className="text-[13px] text-text-primary mb-4">{verification.explanation}</p>
                     
                     {verification.conditions && verification.conditions.length > 0 && (
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid grid-cols-2 gap-2">
                         {verification.conditions.map((cond, i) => (
-                          <div key={i} className="rounded border border-surface-elevated bg-background/50 p-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="font-mono text-xs text-text-secondary">{cond.metric}</span>
-                              <span className={`font-mono text-[10px] uppercase font-bold ${cond.passed ? 'text-status-green' : 'text-status-red'}`}>
-                                {cond.passed ? 'PASS' : 'FAIL'}
-                              </span>
+                          <div key={i} className="flex items-center justify-between rounded bg-background/50 px-2 py-1.5 border border-surface-elevated">
+                            <span className="font-mono text-[10px] text-text-secondary">{cond.metric}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[11px]">{cond.observed_value?.toFixed(1)}</span>
+                              {cond.passed ? <CheckCircle2 className="h-3 w-3 text-status-green" /> : <XCircle className="h-3 w-3 text-status-red" />}
                             </div>
-                            <div className="mt-2 font-mono text-sm">
-                              {cond.observed_value?.toFixed(1)} {cond.passed ? <span className="text-status-green">✓</span> : <span className="text-status-red">✗</span>}
-                            </div>
-                            <div className="mt-1 font-mono text-[10px] text-text-secondary">Expected: {cond.expected}</div>
                           </div>
                         ))}
                       </div>
@@ -206,112 +226,61 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
                 )}
 
                 {remediation && (
-                  <Card className="p-6 border-status-blue/30 bg-status-blue/5">
-                    <h3 className="text-lg font-bold text-white mb-2">Remediation Applied</h3>
-                    <p className="text-sm text-text-primary mb-4">{remediation.title}</p>
-                    
-                    {remediation.diff && (
-                      <div className="mb-4">
-                        <DiffBlock diff={remediation.diff} />
-                      </div>
-                    )}
-
-                    {remediation.validation_status === "VALIDATED" && (
-                      <div className="rounded border border-status-green/20 bg-status-green/10 p-3 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-status-green" />
-                        <span className="text-sm font-medium text-status-green">{remediation.validation_detail || "Post-fix metrics within healthy baseline"}</span>
-                      </div>
-                    )}
+                  <Card className="p-4 border-status-blue/20 bg-status-blue/5">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-status-blue mb-1 block">Remediation Applied</span>
+                    <p className="text-[13px] font-medium text-white mb-3">{remediation.title}</p>
+                    {remediation.diff && <DiffBlock diff={remediation.diff} />}
                   </Card>
                 )}
               </div>
             </section>
           )}
 
-          {/* TELEMETRY */}
-          <section>
-            <SectionHeader title="Observed Telemetry" icon={Activity} description="Live state of the digital twin during experimentation." />
-            {!currentMetrics ? (
-               <div className="rounded border border-surface-elevated border-dashed p-8 text-center text-sm text-text-secondary">
-                 Collecting evidence and telemetry...
-               </div>
-            ) : (
-              <Card className="p-5">
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                  {metricCards.map(({ key, label, format }) => {
-                    const current = currentMetrics[key];
-                    const baseline = baselineMetrics?.[key];
-                    let deltaStr;
-                    let isPositive = false;
-                    
-                    if (baseline !== undefined && baseline !== 0) {
-                      const diff = current - baseline;
-                      const pct = (diff / baseline) * 100;
-                      // Determine if it's "good" based on common sense (lower latency/errors is good)
-                      isPositive = (key === 'cache_hit_rate' ? diff > 0 : diff < 0);
-                      if (Math.abs(pct) > 0.1) {
-                        deltaStr = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
-                      }
-                    }
-
-                    return (
-                      <div key={key} className="rounded border border-surface-elevated bg-background/50 p-3 shadow-inner">
-                        <DisplayValue 
-                          label={label} 
-                          value={format(current)} 
-                          delta={deltaStr} 
-                          previous={baseline ? format(baseline) : undefined}
-                          isPositive={isPositive}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
-          </section>
-
         </div>
 
-        {/* SIDEBAR */}
-        <aside className="space-y-6">
+        {/* RIGHT COLUMN: Evidence & Timeline */}
+        <div className="space-y-6">
           <section>
-            <SectionHeader title="Evidence" icon={FileSearch} />
-            <div className="space-y-3">
+            <SectionHeader title="Evidence Context" icon={FileSearch} />
+            <div className="space-y-2">
               {evidenceToShow.map((evidence) => (
-                <Card key={evidence.id} className="p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-brand">{evidence.type}</span>
-                    <span className="font-mono text-[10px] text-text-secondary">{Math.round(evidence.strength * 100)}% str</span>
+                <Card key={evidence.id} className="p-3 bg-background/50">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-brand">{evidence.type}</span>
+                    <span className="font-mono text-[9px] text-text-secondary">{Math.round(evidence.strength * 100)}% conf</span>
                   </div>
-                  <p className="text-sm text-text-primary leading-relaxed">{evidence.observation}</p>
+                  <p className="text-[12px] text-text-primary leading-snug">{evidence.observation}</p>
                 </Card>
               ))}
             </div>
             {incident.evidence.length > 4 && (
               <button 
                 onClick={() => setEvidenceExpanded(!evidenceExpanded)} 
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded border border-surface-elevated py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-surface-elevated hover:text-white"
+                className="mt-2 w-full rounded border border-surface-elevated py-1.5 text-[11px] font-medium text-text-secondary hover:bg-surface-elevated/50 hover:text-white transition-colors"
               >
-                {evidenceExpanded ? <><ChevronUp className="h-4 w-4" /> Show less</> : <><ChevronDown className="h-4 w-4" /> Show {incident.evidence.length - 4} more</>}
+                {evidenceExpanded ? "Show less" : `+ ${incident.evidence.length - 4} more`}
               </button>
             )}
           </section>
 
-          <section className="pt-4 border-t border-surface-elevated">
-            <SectionHeader title="Audit Timeline" icon={Database} />
-            <div className="relative space-y-4 before:absolute before:inset-0 before:ml-2 before:w-px before:bg-surface-elevated">
-              {incident.timeline.map((event) => (
-                <div key={event.id} className="relative pl-6">
-                  <div className="absolute left-0 top-1.5 h-4 w-4 rounded-full border-4 border-background bg-surface-elevated" />
-                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-brand">{event.event_type}</div>
-                  <p className="text-sm font-medium text-white">{event.title}</p>
-                  {event.description && <p className="mt-1 text-xs text-text-secondary leading-relaxed">{event.description}</p>}
-                </div>
-              ))}
-            </div>
+          <section>
+            <SectionHeader title="Activity Feed" icon={Database} />
+            <Card className="p-3 bg-background/50">
+              <div className="space-y-3">
+                {incident.timeline.map((event) => (
+                  <div key={event.id} className="flex gap-3 text-[12px]">
+                    <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                    <div>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary block mb-0.5">{event.event_type}</span>
+                      <span className="text-text-primary">{event.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </section>
-        </aside>
+        </div>
+
       </div>
     </main>
   );
