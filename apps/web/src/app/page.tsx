@@ -96,7 +96,7 @@ export default function LandingPage() {
               href="/command-center" 
               className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white text-xs font-bold tracking-widest uppercase px-8 py-3 rounded-full transition-colors"
             >
-              Free Trial
+              Enter Command Center
             </Link>
             <Link 
               href="/applications/connect" 
