@@ -7,7 +7,7 @@ dev-db:
 	docker compose up db redis
 
 api:
-	cd apps/api && uvicorn main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 
 web:
 	cd apps/web && npm run dev
