@@ -134,6 +134,10 @@ class DeterministicScenarioAgents:
         return await self.generate_hypotheses(input_data)
 
     async def generate_hypotheses(self, input_data: HypothesisGenerationInput) -> HypothesisGenerationOutput:
+        is_live = any("ApplicationConnector" in e.source for e in input_data.evidence)
+        if is_live:
+            return HypothesisGenerationOutput(hypotheses=[])
+            
         text = " ".join(e.observation.lower() for e in input_data.evidence)
         cache_leads = "cache hit rate measured at 0.15" in text or "cache invalidation" in text
         query_leads = "new product catalog query" in text or "slow queries" in text

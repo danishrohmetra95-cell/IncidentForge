@@ -379,6 +379,12 @@ class InvestigationOrchestrator:
                            f"Generated {len(ctx.hypotheses)} hypotheses")
 
             if not ctx.hypotheses:
+                if incident.reasoning_mode == "live_model":
+                    self._timeline(ctx, "hypotheses.none", "No causal hypothesis could be established from external telemetry.")
+                    # Leave status as HYPOTHESIS_GENERATION or transition to something else, but don't FAIL
+                    ctx.state_machine.transition(InvestigationState.RESOLVED)
+                    ctx.incident.status = InvestigationState.RESOLVED
+                    return False
                 await self._fail(ctx, "No hypotheses generated")
                 return False
 

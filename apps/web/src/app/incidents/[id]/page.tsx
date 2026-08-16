@@ -227,18 +227,36 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
             {sortedHypotheses.length === 0 ? (
               <Card className="p-6 bg-background/30 border-dashed text-center flex flex-col items-center">
                 <Network className="h-8 w-8 text-text-secondary opacity-50 mb-3" />
-                <h3 className="text-sm font-bold text-white mb-1">AWAITING CAUSAL INVESTIGATION</h3>
-                <p className="text-[12px] text-text-secondary mb-4">
-                  {isLiveMode ? "Live telemetry has been collected. No causal hypotheses have been generated yet." : "No hypotheses have been proposed for this incident yet."}
-                </p>
-                {incident.status === "CREATED" && (
-                  <button onClick={() => void runAction('start', () => api.startInvestigation(incident.id))} disabled={activeAction === 'start'} className="bg-brand text-background px-4 py-2 rounded text-sm font-bold hover:bg-brand/90 transition-colors disabled:opacity-50 flex items-center gap-2">
-                    <Play className="w-4 h-4" />
-                    {activeAction === 'start' ? "Starting..." : "Start Investigation"}
-                  </button>
-                )}
-                {incident.status === "CREATED" && isLiveMode && (
-                  <p className="text-[10px] text-text-secondary mt-3">This creates an investigation from observed evidence. No causal root cause is assumed.</p>
+                {isHealthy ? (
+                  <>
+                    <h3 className="text-sm font-bold text-status-green mb-1">HEALTHY / NO DEGRADATION DETECTED</h3>
+                    <p className="text-[12px] text-text-secondary">
+                      Live external telemetry indicates the application is healthy. No causal investigation is required.
+                    </p>
+                  </>
+                ) : incident.status === "RESOLVED" && isLiveMode ? (
+                  <>
+                    <h3 className="text-sm font-bold text-status-amber mb-1">INCONCLUSIVE INVESTIGATION</h3>
+                    <p className="text-[12px] text-text-secondary">
+                      No causal hypothesis could be established from external HTTP telemetry alone.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-sm font-bold text-white mb-1">AWAITING CAUSAL INVESTIGATION</h3>
+                    <p className="text-[12px] text-text-secondary mb-4">
+                      {isLiveMode ? "Live telemetry has been collected. No causal hypotheses have been generated yet." : "No hypotheses have been proposed for this incident yet."}
+                    </p>
+                    {incident.status === "CREATED" && (
+                      <button onClick={() => void runAction('start', () => api.startInvestigation(incident.id))} disabled={activeAction === 'start'} className="bg-brand text-background px-4 py-2 rounded text-sm font-bold hover:bg-brand/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+                        <Play className="w-4 h-4" />
+                        {activeAction === 'start' ? "Starting..." : "Start Investigation"}
+                      </button>
+                    )}
+                    {incident.status === "CREATED" && isLiveMode && (
+                      <p className="text-[10px] text-text-secondary mt-3">This creates an investigation from observed evidence. No causal root cause is assumed.</p>
+                    )}
+                  </>
                 )}
               </Card>
             ) : (
@@ -344,7 +362,7 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
               <Card className="p-6 bg-background/30 border-dashed text-center flex flex-col items-center">
                 <FlaskConical className="h-8 w-8 text-text-secondary opacity-50 mb-3" />
                 <h3 className="text-sm font-bold text-white mb-1">CAUSAL EXPERIMENT</h3>
-                <p className="text-[12px] text-text-secondary">No controlled experiment has been designed yet.</p>
+                <p className="text-[12px] text-text-secondary">No controlled experiment available.</p>
                 {isLiveMode && (
                   <p className="text-[11px] text-status-amber mt-3 bg-status-amber/10 p-2 rounded border border-status-amber/20">External HTTP observations alone cannot establish an internal root cause.</p>
                 )}

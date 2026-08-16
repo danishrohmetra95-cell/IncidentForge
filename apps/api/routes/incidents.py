@@ -320,7 +320,10 @@ async def _run_investigation(incident_id: str) -> None:
 
     ctx = None
     try:
-        incident.reasoning_mode = "live_model" if get_gateway().is_configured else "deterministic_demo"
+        # Only override reasoning_mode for deterministic incidents, preserve live_model for live apps
+        if incident.scenario_id:
+            incident.reasoning_mode = "live_model" if get_gateway().is_configured else "deterministic_demo"
+            
         orchestrator, event_bus = await build_orchestrator(incident_id)
         ctx = await orchestrator.run(incident, scenario_data)
         await repo.save_context(ctx)
