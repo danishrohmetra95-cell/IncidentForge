@@ -90,13 +90,13 @@ export default function Home() {
     // Flow for Experiment Preview
     const targetHypothesis = experiment ? activeIncident.hypotheses.find(h => h.id === experiment.target_hypothesis) : null;
     const flowNodes: Node[] = [
-      { id: 'hyp', position: { x: 50, y: 50 }, data: { label: 'Hypothesis' }, style: { background: '#2a3241', color: '#fff', border: '1px solid #4c566a', borderRadius: '4px', fontSize: '10px' } },
-      { id: 'intv', position: { x: 200, y: 50 }, data: { label: experiment?.intervention.type || 'Intervention' }, style: { background: '#e8a915', color: '#1c212b', border: 'none', fontWeight: 'bold', borderRadius: '4px', fontSize: '10px' } },
-      { id: 'verif', type: 'output', position: { x: 350, y: 50 }, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#2a3241', color: verification?.outcome === 'VERIFIED' ? '#1c212b' : '#fff', border: '1px solid #4c566a', borderRadius: '4px', fontSize: '10px' } }
+      { id: 'hyp', position: { x: 50, y: 50 }, data: { label: 'Hypothesis' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#a0aabf', border: '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '10px', padding: '8px 12px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' } },
+      { id: 'intv', position: { x: 220, y: 50 }, data: { label: experiment?.intervention.type || 'Intervention' }, style: { background: 'rgba(232, 169, 21, 0.1)', color: '#e8a915', border: '1px solid rgba(232, 169, 21, 0.3)', fontWeight: 'bold', borderRadius: '8px', fontSize: '10px', padding: '8px 12px', boxShadow: '0 0 16px rgba(232, 169, 21, 0.1) inset' } },
+      { id: 'verif', type: 'output', position: { x: 420, y: 50 }, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? 'rgba(163, 190, 140, 0.15)' : 'rgba(42, 50, 65, 0.9)', color: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#fff', border: verification?.outcome === 'VERIFIED' ? '1px solid rgba(163, 190, 140, 0.4)' : '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '10px', padding: '8px 12px', boxShadow: verification?.outcome === 'VERIFIED' ? '0 0 16px rgba(163, 190, 140, 0.15) inset, 0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.2)' } }
     ];
     const flowEdges: Edge[] = [
-      { id: 'e1', source: 'hyp', target: 'intv', animated: true, style: { stroke: '#4c566a' } },
-      { id: 'e2', source: 'intv', target: 'verif', animated: experiment?.status === 'executed', style: { stroke: '#4c566a' } }
+      { id: 'e1', source: 'hyp', target: 'intv', animated: true, style: { stroke: 'rgba(76, 86, 106, 0.8)', strokeWidth: 1.5 } },
+      { id: 'e2', source: 'intv', target: 'verif', animated: experiment?.status === 'executed', style: { stroke: experiment?.status === 'executed' ? 'rgba(232, 169, 21, 0.6)' : 'rgba(76, 86, 106, 0.8)', strokeWidth: 1.5 } }
     ];
 
     const chartData = verification ? verification.conditions.slice(0, 3).map(c => ({
