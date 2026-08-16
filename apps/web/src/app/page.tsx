@@ -86,10 +86,10 @@ export default function Home() {
 
     // React Flow Config
     const flowNodes: Node[] = [
-      { id: 'hyp', position: { x: 50, y: 0 }, data: { label: 'Hypothesis' }, style: { background: 'rgba(28, 33, 43, 0.9)', color: '#a0aabf', border: '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '6px', fontSize: '10px', padding: '6px 12px', width: 120, textAlign: 'center' } },
-      { id: 'crit', position: { x: 50, y: 80 }, data: { label: 'Critic Challenge' }, style: { background: 'rgba(208, 135, 112, 0.05)', color: '#d08770', border: '1px solid rgba(208, 135, 112, 0.3)', borderRadius: '6px', fontSize: '10px', padding: '6px 12px', width: 120, textAlign: 'center' } },
-      { id: 'intv', position: { x: 50, y: 160 }, data: { label: experiment?.intervention.type || 'Intervention' }, style: { background: 'rgba(232, 169, 21, 0.1)', color: '#e8a915', border: '1px solid rgba(232, 169, 21, 0.4)', fontWeight: 'bold', borderRadius: '6px', fontSize: '10px', padding: '8px 12px', width: 120, textAlign: 'center', boxShadow: '0 0 16px rgba(232, 169, 21, 0.15) inset' } },
-      { id: 'verif', position: { x: 50, y: 240 }, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? 'rgba(163, 190, 140, 0.15)' : 'rgba(28, 33, 43, 0.9)', color: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#fff', border: verification?.outcome === 'VERIFIED' ? '1px solid rgba(163, 190, 140, 0.5)' : '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '6px', fontSize: '10px', padding: '6px 12px', width: 120, textAlign: 'center', fontWeight: 'bold', boxShadow: verification?.outcome === 'VERIFIED' ? '0 0 16px rgba(163, 190, 140, 0.1) inset' : 'none' } }
+      { id: 'hyp', type: 'default', position: { x: 50, y: 0 }, draggable: false, connectable: false, selectable: false, data: { label: 'Hypothesis' }, style: { background: 'rgba(28, 33, 43, 0.9)', color: '#a0aabf', border: '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '6px', fontSize: '10px', padding: '6px 12px', width: 120, textAlign: 'center' } },
+      { id: 'crit', type: 'default', position: { x: 50, y: 80 }, draggable: false, connectable: false, selectable: false, data: { label: 'Critic Challenge' }, style: { background: 'rgba(208, 135, 112, 0.05)', color: '#d08770', border: '1px solid rgba(208, 135, 112, 0.3)', borderRadius: '6px', fontSize: '10px', padding: '6px 12px', width: 120, textAlign: 'center' } },
+      { id: 'intv', type: 'default', position: { x: 50, y: 160 }, draggable: false, connectable: false, selectable: false, data: { label: experiment?.intervention.type || 'Intervention' }, style: { background: 'rgba(232, 169, 21, 0.1)', color: '#e8a915', border: '1px solid rgba(232, 169, 21, 0.4)', fontWeight: 'bold', borderRadius: '6px', fontSize: '10px', padding: '8px 12px', width: 120, textAlign: 'center', boxShadow: '0 0 16px rgba(232, 169, 21, 0.15) inset' } },
+      { id: 'verif', type: 'default', position: { x: 50, y: 240 }, draggable: false, connectable: false, selectable: false, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? 'rgba(163, 190, 140, 0.15)' : 'rgba(28, 33, 43, 0.9)', color: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#fff', border: verification?.outcome === 'VERIFIED' ? '1px solid rgba(163, 190, 140, 0.5)' : '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '6px', fontSize: '10px', padding: '6px 12px', width: 120, textAlign: 'center', fontWeight: 'bold', boxShadow: verification?.outcome === 'VERIFIED' ? '0 0 16px rgba(163, 190, 140, 0.1) inset' : 'none' } }
     ];
     const flowEdges: Edge[] = [
       { id: 'e1', source: 'hyp', target: 'crit', animated: true, style: { stroke: 'rgba(208, 135, 112, 0.5)', strokeWidth: 1.5 } },
@@ -265,8 +265,18 @@ export default function Home() {
                   
                   {/* Integrated React Flow & Telemetry */}
                   <div className="flex-1 flex flex-col p-4 gap-6">
-                    <div className="h-[280px] w-full rounded border border-surface-elevated/30 bg-[#0b0e14] relative shadow-inner">
-                      <ReactFlow nodes={flowNodes} edges={flowEdges} fitView attributionPosition="bottom-right" panOnDrag={false} zoomOnScroll={false}>
+                    <div className="h-[280px] w-full rounded border border-surface-elevated/30 bg-[#0b0e14] relative shadow-inner [&_.react-flow__handle]:hidden [&_.react-flow__node]:!cursor-default [&_.react-flow__node.selected]:!shadow-none [&_.react-flow__node:focus]:!outline-none">
+                      <ReactFlow 
+                        nodes={flowNodes} 
+                        edges={flowEdges} 
+                        fitView 
+                        attributionPosition="bottom-right" 
+                        panOnDrag={false} 
+                        zoomOnScroll={false}
+                        nodesDraggable={false}
+                        nodesConnectable={false}
+                        elementsSelectable={false}
+                      >
                         <Background color="#2a3241" gap={12} size={1} />
                       </ReactFlow>
                     </div>

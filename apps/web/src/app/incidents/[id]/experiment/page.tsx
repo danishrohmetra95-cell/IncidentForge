@@ -84,10 +84,10 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
             const verification = incident.verifications.find(v => v.experiment_id === experiment.id);
 
             const flowNodes: Node[] = [
-              { id: 'hyp', type: 'input', position: { x: 50, y: 50 }, data: { label: 'Hypothesis' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#a0aabf', border: '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' } },
-              { id: 'crit', position: { x: 50, y: 130 }, data: { label: 'Critic' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#d08770', border: '1px solid rgba(208, 135, 112, 0.4)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: '0 0 12px rgba(208, 135, 112, 0.1) inset' } },
-              { id: 'intv', position: { x: 250, y: 50 }, data: { label: 'Intervention' }, style: { background: 'rgba(232, 169, 21, 0.1)', color: '#e8a915', border: '1px solid rgba(232, 169, 21, 0.3)', fontWeight: 'bold', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: '0 0 16px rgba(232, 169, 21, 0.1) inset' } },
-              { id: 'verif', type: 'output', position: { x: 250, y: 160 }, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? 'rgba(163, 190, 140, 0.15)' : 'rgba(42, 50, 65, 0.9)', color: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#fff', border: verification?.outcome === 'VERIFIED' ? '1px solid rgba(163, 190, 140, 0.4)' : '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: verification?.outcome === 'VERIFIED' ? '0 0 16px rgba(163, 190, 140, 0.15) inset, 0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.2)' } }
+              { id: 'hyp', type: 'default', position: { x: 50, y: 50 }, draggable: false, connectable: false, selectable: false, data: { label: 'Hypothesis' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#a0aabf', border: '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' } },
+              { id: 'crit', type: 'default', position: { x: 50, y: 130 }, draggable: false, connectable: false, selectable: false, data: { label: 'Critic' }, style: { background: 'rgba(42, 50, 65, 0.9)', color: '#d08770', border: '1px solid rgba(208, 135, 112, 0.4)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: '0 0 12px rgba(208, 135, 112, 0.1) inset' } },
+              { id: 'intv', type: 'default', position: { x: 250, y: 50 }, draggable: false, connectable: false, selectable: false, data: { label: 'Intervention' }, style: { background: 'rgba(232, 169, 21, 0.1)', color: '#e8a915', border: '1px solid rgba(232, 169, 21, 0.3)', fontWeight: 'bold', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: '0 0 16px rgba(232, 169, 21, 0.1) inset' } },
+              { id: 'verif', type: 'default', position: { x: 250, y: 160 }, draggable: false, connectable: false, selectable: false, data: { label: verification?.outcome || 'Pending' }, style: { background: verification?.outcome === 'VERIFIED' ? 'rgba(163, 190, 140, 0.15)' : 'rgba(42, 50, 65, 0.9)', color: verification?.outcome === 'VERIFIED' ? '#a3be8c' : '#fff', border: verification?.outcome === 'VERIFIED' ? '1px solid rgba(163, 190, 140, 0.4)' : '1px solid rgba(76, 86, 106, 0.5)', borderRadius: '8px', fontSize: '11px', padding: '8px 12px', boxShadow: verification?.outcome === 'VERIFIED' ? '0 0 16px rgba(163, 190, 140, 0.15) inset, 0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.2)' } }
             ];
             const flowEdges: Edge[] = [
               { id: 'e1', source: 'hyp', target: 'crit', animated: true, style: { stroke: 'rgba(208, 135, 112, 0.6)', strokeWidth: 1.5 } },
@@ -142,8 +142,16 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
                 <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr] items-stretch">
                   <Card className="h-full min-h-[320px] overflow-hidden p-0 relative border-surface-elevated flex flex-col">
                     <div className="absolute top-3 left-3 z-10 font-mono text-[9px] uppercase tracking-wider text-text-secondary bg-background/80 px-2 py-1 rounded">Reasoning Graph</div>
-                    <div className="flex-1 w-full h-full relative">
-                      <ReactFlow nodes={flowNodes} edges={flowEdges} fitView attributionPosition="bottom-right">
+                    <div className="flex-1 w-full h-full relative [&_.react-flow__handle]:hidden [&_.react-flow__node]:!cursor-default [&_.react-flow__node.selected]:!shadow-none [&_.react-flow__node:focus]:!outline-none">
+                      <ReactFlow 
+                        nodes={flowNodes} 
+                        edges={flowEdges} 
+                        fitView 
+                        attributionPosition="bottom-right"
+                        nodesDraggable={false}
+                        nodesConnectable={false}
+                        elementsSelectable={false}
+                      >
                         <Background color="#2a3241" gap={16} size={1} />
                         <Controls showInteractive={false} className="opacity-50" />
                       </ReactFlow>
