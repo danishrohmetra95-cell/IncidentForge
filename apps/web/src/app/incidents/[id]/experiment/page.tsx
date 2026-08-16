@@ -121,7 +121,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
           ];
 
           return (
-            <div key={experiment.id} className="border border-surface-elevated rounded-lg p-6 bg-surface mb-10">
+            <div key={experiment.id} className="border border-surface-elevated rounded-lg p-6 bg-surface/50 backdrop-blur-sm mb-10">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-bold">Experiment {idx + 1}: {experiment.intervention.type}</h2>
                 <div className="flex flex-wrap gap-2">
@@ -172,7 +172,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
               </div>
 
               <div className="grid gap-6 lg:grid-cols-2 mb-8">
-                <article className="rounded border border-surface-elevated bg-background p-6">
+                <article className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
                   <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Hypothesis & Critiques</h3>
                   <p className="mt-4 text-sm font-medium">{target?.statement}</p>
                   {critique && (
@@ -184,7 +184,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
                     </div>
                   )}
                 </article>
-                <article className="rounded border border-surface-elevated bg-background p-6">
+                <article className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
                   <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Prediction contract</h3>
                   <div className="mt-4 space-y-3">
                     {experiment.expected_conditions.map((condition) => (
@@ -199,7 +199,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
 
               {observation && verification && (
                 <div className="mb-8 space-y-8">
-                  <div className="rounded border border-surface-elevated bg-background p-6">
+                  <div className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                       <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Metrics Comparison (Bar Chart)</h3>
                     </div>
@@ -218,7 +218,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
                     </div>
                   </div>
 
-                  <div className="rounded border border-surface-elevated bg-background p-6">
+                  <div className="rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-6">
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                       <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-text-secondary">Detailed Metrics Table</h3>
                       <VerificationBadge result={verification.outcome} />
@@ -255,7 +255,7 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-status-green">Remediation {incident.remediation.validation_status}</p>
           <h2 className="mt-2 text-xl font-bold">{incident.remediation.title}</h2>
           <p className="mt-2 text-sm text-text-secondary">{incident.remediation.description}</p>
-          {incident.remediation.diff && <pre className="mt-4 overflow-x-auto rounded border border-surface-elevated bg-background p-4 text-xs text-text-secondary">{incident.remediation.diff}</pre>}
+          {incident.remediation.diff && <pre className="mt-4 overflow-x-auto rounded border border-surface-elevated bg-surface/50 backdrop-blur-sm p-4 text-xs text-text-secondary">{incident.remediation.diff}</pre>}
           {incident.remediation.validation_detail && <p className="mt-4 text-sm text-status-green">{incident.remediation.validation_detail}</p>}
         </section>
       )}

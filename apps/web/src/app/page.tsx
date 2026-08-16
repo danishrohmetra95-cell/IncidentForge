@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronRight, Plus, Server } from "lucide-react";
+import { AlertTriangle, ChevronRight, Plus, Server, Activity, Database, GitBranch, TerminalSquare, Search } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { IncidentSummary, Scenario } from "@/lib/types";
 import { SeverityBadge, StatusBadge } from "@/components/Badges";
+import { Card } from "@/components/UI";
 
 export default function Home() {
   const router = useRouter();
@@ -48,47 +49,102 @@ export default function Home() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl p-6 md:p-10">
-      <section className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-        <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-[0.24em] text-brand">IncidentForge / command center</p>
-          <h1 className="text-3xl font-bold tracking-tight">Experiment-backed incident reasoning</h1>
-          <p className="mt-3 max-w-2xl text-sm text-text-secondary">AI can propose an explanation; the simulator, safety gate, and deterministic verifier decide what is actually supported.</p>
+    <main className="mx-auto max-w-6xl p-6 md:p-12 animate-in fade-in duration-500">
+      <section className="mb-16 flex flex-col justify-between gap-8 md:flex-row md:items-end">
+        <div className="max-w-2xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-brand">
+            <div className="h-1.5 w-1.5 rounded-full bg-brand animate-pulse" />
+            System Online
+          </div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-white md:text-5xl">AI Incident Command</h1>
+          <p className="mt-4 text-base leading-relaxed text-text-secondary">
+            Deterministic verification for LLM reasoning. AI proposes hypotheses, 
+            an adversarial critic challenges them, and the digital twin mathematically verifies 
+            the root cause before applying remediation.
+          </p>
         </div>
-        <div className="flex flex-col items-end gap-3">
-          {scenarios.length > 0 && (
+        
+        <Card className="flex flex-col gap-4 p-5 md:min-w-[320px] shadow-2xl shadow-brand/5">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+            <TerminalSquare className="h-4 w-4" /> Initialize Scenario
+          </div>
+          {scenarios.length > 0 ? (
             <select
               value={selectedScenarioId}
               onChange={(e) => setSelectedScenarioId(e.target.value)}
-              className="rounded border border-surface-elevated bg-surface px-3 py-1.5 text-sm text-text-primary outline-none focus:border-brand"
+              className="w-full rounded-md border border-surface-elevated bg-background px-3 py-2.5 text-sm text-text-primary shadow-inner outline-none transition-colors focus:border-brand"
             >
               {scenarios.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
+          ) : (
+            <div className="h-10 w-full animate-pulse rounded bg-surface-elevated/50" />
           )}
-          <button onClick={() => void createDemo()} disabled={creating} className="inline-flex items-center justify-center rounded bg-brand px-4 py-2.5 text-sm font-bold text-background transition hover:bg-brand/90 disabled:opacity-50">
-            <Plus className="mr-2 h-4 w-4" /> {creating ? "Starting investigation…" : "Run deterministic demo"}
+          <button 
+            onClick={() => void createDemo()} 
+            disabled={creating} 
+            className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-md bg-brand px-4 py-2.5 text-sm font-bold text-background transition-all hover:bg-brand/90 disabled:opacity-50"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <Plus className="h-4 w-4" /> 
+              {creating ? "Bootstrapping simulation..." : "Run deterministic demo"}
+            </span>
+            <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] transition-transform duration-1000 group-hover:translate-x-[100%]" />
           </button>
-        </div>
+        </Card>
       </section>
 
-      {error && <div className="mb-6 rounded border border-status-red/40 bg-status-red/10 p-4 text-sm text-status-red"><AlertTriangle className="mr-2 inline h-4 w-4" />{error}</div>}
-
-      <section className="overflow-hidden rounded-lg border border-surface-elevated bg-surface">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-surface-elevated px-5 py-3 font-mono text-xs uppercase tracking-wider text-text-secondary">
-          <span>Incident</span><span className="hidden sm:block">Reasoning</span><span>Status</span>
+      {error && (
+        <div className="mb-8 flex items-center gap-3 rounded-lg border border-status-red/30 bg-status-red/10 p-4 text-sm text-status-red shadow-lg shadow-status-red/5">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <p>{error}</p>
         </div>
+      )}
+
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-secondary">Active Investigations</h2>
+        <div className="flex items-center gap-2 font-mono text-xs text-text-secondary">
+          <Activity className="h-4 w-4" /> {incidents.length} total
+        </div>
+      </div>
+
+      <div className="grid gap-3">
         {incidents.map((incident) => (
-          <div onClick={() => router.push(`/incidents/${incident.id}`)} key={incident.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-surface-elevated px-5 py-5 transition hover:bg-surface-elevated/40 last:border-0 cursor-pointer">
-            <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap items-center gap-2"><SeverityBadge severity={incident.severity} /><h2 className="truncate font-semibold">{incident.title}</h2></div>
-              <div className="flex items-center gap-2 font-mono text-xs text-text-secondary"><Server className="h-3.5 w-3.5" />{incident.service}<span>·</span><span>{incident.hypothesis_count} hypotheses / {incident.evidence_count} evidence</span></div>
-            </div>
-            <span className="hidden rounded border border-surface-elevated px-2 py-1 font-mono text-[10px] uppercase text-text-secondary sm:block">{incident.reasoning_mode === "live_model" ? "Live model" : "Deterministic demo"}</span>
-            <div className="flex items-center gap-3"><StatusBadge status={incident.status} /><ChevronRight className="h-4 w-4 text-text-secondary" /></div>
-          </div>
+          <Link href={`/incidents/${incident.id}`} key={incident.id} className="group block">
+            <Card className="grid items-center gap-4 p-5 transition-all duration-300 hover:border-brand/30 hover:bg-surface-elevated hover:shadow-lg hover:shadow-brand/5 md:grid-cols-[1fr_auto_auto]">
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-3">
+                  <SeverityBadge severity={incident.severity} />
+                  <h3 className="truncate text-lg font-semibold text-text-primary group-hover:text-white transition-colors">{incident.title}</h3>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 font-mono text-xs text-text-secondary">
+                  <span className="flex items-center gap-1.5"><Server className="h-3.5 w-3.5" />{incident.service}</span>
+                  <span className="text-surface-elevated">•</span>
+                  <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />{incident.hypothesis_count} hypotheses</span>
+                  <span className="text-surface-elevated">•</span>
+                  <span className="flex items-center gap-1.5"><Database className="h-3.5 w-3.5" />{incident.evidence_count} evidence</span>
+                </div>
+              </div>
+              
+              <div className="hidden flex-col items-end gap-2 md:flex">
+                <span className="rounded border border-surface-elevated bg-background/50 px-2 py-1 font-mono text-[10px] uppercase text-text-secondary shadow-inner">
+                  {incident.reasoning_mode === "live_model" ? "Live Model" : "Deterministic Fallback"}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <StatusBadge status={incident.status} />
+                <ChevronRight className="h-5 w-5 text-text-secondary transition-transform group-hover:translate-x-1 group-hover:text-brand" />
+              </div>
+            </Card>
+          </Link>
         ))}
-        {!error && incidents.length === 0 && <div className="p-12 text-center text-sm text-text-secondary">No incident investigations have been created yet.</div>}
-      </section>
+        {!error && incidents.length === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-surface-elevated py-20 text-center">
+            <Search className="mb-4 h-8 w-8 text-surface-elevated" />
+            <p className="font-mono text-sm uppercase tracking-wider text-text-secondary">No active incidents</p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
