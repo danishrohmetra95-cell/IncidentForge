@@ -47,6 +47,8 @@ export function Sidebar() {
     ? "bg-status-red"
     : "bg-brand animate-pulse";
 
+  if (pathname === "/") return null;
+
   return (
     <aside className="w-[240px] shrink-0 bg-surface/80 backdrop-blur border-r border-surface-elevated/50 flex flex-col z-10 relative">
       <div className="h-14 flex items-center px-5 border-b border-surface-elevated/50">
@@ -57,8 +59,8 @@ export function Sidebar() {
       <div className="flex-1 flex flex-col gap-6 py-5 px-3 overflow-y-auto">
         <div className="space-y-1">
           <p className="px-3 text-[10px] font-mono uppercase tracking-wider text-brand mb-2">Deterministic Demo</p>
-          <Link href="/" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/" || (pathname.startsWith("/incidents") && !pathname.includes("/applications")) ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
-            <Activity className={cn("w-4 h-4 mr-3 transition-transform group-hover:scale-110", pathname === "/" || (pathname.startsWith("/incidents") && !pathname.includes("/applications")) ? "text-brand" : "")} />
+          <Link href="/command-center" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/command-center" || (pathname.startsWith("/incidents") && !pathname.includes("/applications")) ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
+            <Activity className={cn("w-4 h-4 mr-3 transition-transform group-hover:scale-110", pathname === "/command-center" || (pathname.startsWith("/incidents") && !pathname.includes("/applications")) ? "text-brand" : "")} />
             Command Center
           </Link>
           <Link href="/memory" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/memory" ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
