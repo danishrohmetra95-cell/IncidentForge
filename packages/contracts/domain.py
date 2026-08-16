@@ -310,3 +310,28 @@ class CounterfactualResult(DomainModel):
     estimated_avoided_failures: int
     intervention_time_offset_seconds: int
     note: str
+
+class HealthStatus(str, Enum):
+    HEALTHY = "HEALTHY"
+    DEGRADED = "DEGRADED"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class LiveApplicationObservation(DomainModel):
+    id: str = Field(default_factory=lambda: new_id("obs"))
+    application_url: str
+    observed_at: datetime = Field(default_factory=now)
+    http_status: int | None = None
+    availability: float | None = None
+    latency_samples: list[float] = Field(default_factory=list)
+    p50_latency: float | None = None
+    p95_latency: float | None = None
+    p99_latency: float | None = None
+    error_rate: float | None = None
+    tls_valid: bool | None = None
+    tls_expiry: datetime | None = None
+    redirect_chain: list[str] = Field(default_factory=list)
+    response_size: int | None = None
+    observation_window_seconds: int = 10
+    status: HealthStatus = HealthStatus.UNAVAILABLE
+    error_message: str | None = None

@@ -2,7 +2,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apps.api.config import settings
-from apps.api.routes import events, experiments, incidents, memory, remediation, system, hypotheses
+from apps.api.routes import (
+    events,
+    experiments,
+    hypotheses,
+    incidents,
+    memory,
+    remediation,
+    system,
+    applications
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +39,7 @@ app.include_router(memory.router)
 app.include_router(system.router)
 app.include_router(events.router)
 app.include_router(hypotheses.router)
+app.include_router(applications.router)
 
 @app.get("/api/health")
 async def health_check():

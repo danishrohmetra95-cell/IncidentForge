@@ -10,7 +10,8 @@ from packages.contracts.domain import (
     Remediation, TimelineEvent, IncidentMemoryRecord, AgentRun, InvestigationState,
     Severity, EvidenceType, HypothesisStatus, MetricDirection, Prediction,
     InterventionSpec, ExperimentControls, MetricExpectation, TelemetrySnapshot,
-    ConditionResult, VerificationOutcome, RemediationType, IncidentFingerprint
+    ConditionResult, VerificationOutcome, RemediationType, IncidentFingerprint,
+    LiveApplicationObservation
 )
 from packages.orchestration.orchestrator import InvestigationContext
 from apps.api.database import async_sessionmaker_factory
@@ -39,6 +40,7 @@ class IncidentRepository:
         self._timelines: dict[str, list[TimelineEvent]] = {}
         self._memories: dict[str, IncidentMemoryRecord] = {}
         self._agent_runs: dict[str, list[AgentRun]] = {}
+        self._live_observations: dict[str, LiveApplicationObservation] = {}
         # One memory implementation owns similarity policy.  A repository may
         # receive the application singleton; standalone repositories retain an
         # isolated in-memory store for tests and offline use.
@@ -376,13 +378,18 @@ class IncidentRepository:
             logger.warning(f"Failed to save agent run to DB: {e}")
             self._db_available = False
 
+    async def save_live_observation(self, observation: LiveApplicationObservation) -> None:
+        self._live_observations[observation.id] = observation
+
+    async def get_live_observation(self, observation_id: str) -> LiveApplicationObservation | None:
+        return self._live_observations.get(observation_id)
+
+
 _repository_instance = None
 
 def get_repository() -> IncidentRepository:
     global _repository_instance
     if _repository_instance is None:
-        # Keep API persistence and the orchestrator on the same memory store.
-        # Import lazily to avoid a composition-root import cycle.
         from apps.api.services import get_memory_store
         _repository_instance = IncidentRepository(memory_store=get_memory_store())
     return _repository_instance

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Brain, ShieldAlert, Cpu, Database, Server } from "lucide-react";
+import { Activity, Brain, ShieldAlert, Cpu, Database, Server, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -56,14 +56,22 @@ export function Sidebar() {
       
       <div className="flex-1 flex flex-col gap-6 py-5 px-3 overflow-y-auto">
         <div className="space-y-1">
-          <p className="px-3 text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-2">Investigations</p>
-          <Link href="/" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/" || pathname.startsWith("/incidents") ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
-            <Activity className={cn("w-4 h-4 mr-3 transition-transform group-hover:scale-110", pathname === "/" || pathname.startsWith("/incidents") ? "text-brand" : "")} />
+          <p className="px-3 text-[10px] font-mono uppercase tracking-wider text-brand mb-2">Deterministic Demo</p>
+          <Link href="/" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/" || (pathname.startsWith("/incidents") && !pathname.includes("/applications")) ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
+            <Activity className={cn("w-4 h-4 mr-3 transition-transform group-hover:scale-110", pathname === "/" || (pathname.startsWith("/incidents") && !pathname.includes("/applications")) ? "text-brand" : "")} />
             Command Center
           </Link>
           <Link href="/memory" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/memory" ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
             <Brain className={cn("w-4 h-4 mr-3 transition-transform group-hover:scale-110", pathname === "/memory" ? "text-brand" : "")} />
             Institutional Memory
+          </Link>
+        </div>
+
+        <div className="space-y-1">
+          <p className="px-3 text-[10px] font-mono uppercase tracking-wider text-brand mb-2">Live Application</p>
+          <Link href="/applications/connect" className={cn("group flex items-center px-3 py-2 text-sm rounded-md transition-colors", pathname === "/applications/connect" ? "text-white bg-surface-elevated/80 shadow-sm" : "text-text-secondary hover:text-white hover:bg-surface-elevated/40")}>
+            <Globe className={cn("w-4 h-4 mr-3 transition-transform group-hover:scale-110", pathname === "/applications/connect" ? "text-brand" : "")} />
+            Connect Application
           </Link>
         </div>
 
