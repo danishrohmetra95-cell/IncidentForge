@@ -1,186 +1,140 @@
-﻿"use client";
+
+"use client";
 
 import Link from "next/link";
-import { ShieldAlert, ArrowRight, Activity, Beaker, CheckCircle2 } from "lucide-react";
+import { Search, Menu, Play } from "lucide-react";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#080b10] text-white flex flex-col relative overflow-hidden font-sans selection:bg-brand/30 selection:text-brand">
-      
-      {/* Background glow & gradients */}
-      <div className="absolute top-0 right-0 w-3/4 h-screen bg-gradient-to-bl from-brand/5 via-brand/[0.02] to-transparent rounded-bl-full opacity-60 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-gradient-to-tr from-brand/[0.03] to-transparent rounded-tr-full opacity-50 pointer-events-none" />
+    <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden font-sans">
+      {/* Topographic Background */}
+      <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center opacity-80">
+        <svg viewBox="0 0 1000 1000" className="w-[150%] h-[150%] max-w-none opacity-80" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="topo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#4f46e5" /> {/* Indigo */}
+              <stop offset="50%" stopColor="#a855f7" /> {/* Purple */}
+              <stop offset="100%" stopColor="#3b82f6" /> {/* Blue */}
+            </linearGradient>
+          </defs>
+          <g fill="none" stroke="url(#topo-grad)" strokeWidth="2" className="opacity-60">
+            <path d="M 400,500 C 400,300 600,200 700,400 C 800,600 600,700 400,500 Z" transform="scale(0.2) translate(1600, 1600)" />
+            <path d="M 350,500 C 350,250 650,150 750,400 C 850,650 650,750 350,500 Z" transform="scale(0.35) translate(600, 600)" />
+            <path d="M 300,500 C 300,200 700,100 800,400 C 900,700 700,800 300,500 Z" transform="scale(0.5) translate(300, 300)" />
+            <path d="M 250,500 C 250,150 750,50 850,400 C 950,750 750,850 250,500 Z" transform="scale(0.65) translate(130, 130)" />
+            <path d="M 200,500 C 200,100 800,0 900,400 C 1000,800 800,900 200,500 Z" transform="scale(0.8) translate(30, 30)" />
+            <path d="M 150,500 C 150,50 850,-50 950,400 C 1050,850 850,950 150,500 Z" transform="scale(0.95) translate(-30, -30)" />
+            <path d="M 100,500 C 100,0 900,-100 1000,400 C 1100,900 900,1000 100,500 Z" transform="scale(1.1) translate(-80, -80)" />
+            <path d="M 50,500 C 50,-50 950,-150 1050,400 C 1150,950 950,1050 50,500 Z" transform="scale(1.25) translate(-120, -120)" />
+            <path d="M 0,500 C 0,-100 1000,-200 1100,400 C 1200,1000 1000,1100 0,500 Z" transform="scale(1.4) translate(-160, -160)" />
+            
+            {/* Right side waves */}
+            <path d="M 800,700 C 700,900 900,1000 1100,800 C 1300,600 1000,500 800,700 Z" transform="scale(0.4) translate(800, -200)" />
+            <path d="M 750,700 C 600,950 950,1050 1150,800 C 1350,550 1050,450 750,700 Z" transform="scale(0.6) translate(400, -100)" />
+            <path d="M 700,700 C 500,1000 1000,1100 1200,800 C 1400,500 1100,400 700,700 Z" transform="scale(0.8) translate(150, 0)" />
+            <path d="M 650,700 C 400,1050 1050,1150 1250,800 C 1450,450 1150,350 650,700 Z" transform="scale(1.0) translate(0, 50)" />
+            <path d="M 600,700 C 300,1100 1100,1200 1300,800 C 1500,400 1200,300 600,700 Z" transform="scale(1.2) translate(-100, 100)" />
+          </g>
+        </svg>
+      </div>
 
-      {/* Top Header */}
-      <header className="p-8 flex items-center justify-between relative z-10 animate-fade-in-up opacity-0-init">
+      {/* Navigation */}
+      <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-[1600px] mx-auto w-full">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded flex items-center justify-center bg-brand/10 border border-brand/20 shadow-[0_0_15px_rgba(232,169,21,0.15)]">
-            <ShieldAlert className="w-5 h-5 text-brand" />
+          <div className="flex items-center">
+            {/* Logo Icon similar to the reference */}
+            <div className="flex">
+              <div className="w-0 h-0 border-t-8 border-b-8 border-r-[12px] border-transparent border-r-white mr-[-4px] z-10"></div>
+              <div className="w-8 h-8 rounded-full border-4 border-white"></div>
+            </div>
           </div>
-          <span className="font-bold text-xl tracking-tight text-white/90">IncidentForge</span>
+          <div className="font-bold text-lg leading-tight uppercase tracking-wider">
+            Incident<br />Forge
+          </div>
         </div>
-      </header>
+
+        <div className="hidden lg:flex items-center gap-10 text-xs font-bold tracking-widest uppercase">
+          <Link href="#" className="hover:text-blue-400 transition-colors">About</Link>
+          <Link href="#" className="hover:text-blue-400 transition-colors">Download</Link>
+          <Link href="#" className="hover:text-blue-400 transition-colors">Pricing</Link>
+          <Link href="#" className="hover:text-blue-400 transition-colors">Features</Link>
+          <Link href="#" className="hover:text-blue-400 transition-colors">Contact</Link>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <Link href="/command-center" className="hidden md:block bg-[#4f46e5] hover:bg-[#4338ca] text-white text-xs font-bold tracking-widest uppercase px-8 py-3 rounded-full transition-colors">
+            Sign In
+          </Link>
+          <button className="p-2">
+            <Menu className="w-6 h-6" />
+          </button>
+        </div>
+      </nav>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col lg:flex-row relative z-10 max-w-[1440px] w-full mx-auto">
+      <main className="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-between px-8 lg:px-24 max-w-[1600px] mx-auto w-full">
         
-        {/* Left Column - Copy & CTA */}
-        <div className="flex-1 flex flex-col justify-center px-8 lg:px-16 xl:px-24 pt-12 pb-24 lg:py-0">
+        {/* Left Side */}
+        <div className="flex-1 w-full max-w-2xl mt-12 md:mt-0">
+          <h1 className="text-7xl lg:text-8xl xl:text-[120px] font-bold tracking-tight mb-8 leading-none">
+            Welcome.
+          </h1>
           
-          <div className="mb-6 animate-fade-in-up delay-200 opacity-0-init">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 mb-8">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-              <span className="text-[10px] uppercase tracking-widest font-mono text-white/60">IncidentForge Core</span>
-            </div>
-            
-            <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tighter leading-[1.1] mb-6 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-              AI that investigates incidents.<br/>
-              Then proves the cause.
-            </h1>
-            
-            <p className="text-lg lg:text-xl text-white/40 tracking-wide font-light max-w-xl">
-              Observe. Hypothesize. Challenge. Experiment. Verify.
-            </p>
+          <div className="relative mb-12 max-w-lg">
+            <input 
+              type="text" 
+              className="w-full bg-transparent border-2 border-white/80 rounded-full py-4 px-6 text-white placeholder-white/50 focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder=""
+            />
+            <button className="absolute right-4 top-1/2 -translate-y-1/2 p-2">
+              <Search className="w-6 h-6" />
+            </button>
           </div>
 
-          <div className="space-y-6 mt-10 animate-fade-in-up delay-300 opacity-0-init">
-            <div className="flex flex-wrap items-center gap-6">
-              <Link 
-                href="/command-center" 
-                className="group relative px-8 py-4 bg-brand text-[#080b10] font-bold text-sm tracking-wide rounded hover:bg-brand/90 transition-all duration-300 overflow-hidden flex items-center gap-3 shadow-[0_0_30px_rgba(232,169,21,0.2)]"
-              >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-                <span className="relative">Enter Command Center</span>
-                <ArrowRight className="w-4 h-4 relative transition-transform group-hover:translate-x-1" />
-              </Link>
-              
-              <Link 
-                href="/applications/connect" 
-                className="text-sm font-medium text-white/50 hover:text-white transition-colors tracking-wide"
-              >
-                View Live Application Connector
-              </Link>
-            </div>
-            
-            <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-white/30 pt-4">
-              <Activity className="w-3 h-3 text-brand/50" />
-              Deterministic Verification Engine • System Online
-            </div>
+          <div className="flex items-center gap-6">
+            <Link 
+              href="/command-center" 
+              className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white text-xs font-bold tracking-widest uppercase px-8 py-3 rounded-full transition-colors"
+            >
+              Free Trial
+            </Link>
+            <Link 
+              href="/applications/connect" 
+              className="bg-transparent border border-white/60 hover:border-white text-white text-xs tracking-widest px-8 py-3 rounded-full transition-colors"
+            >
+              see more
+            </Link>
           </div>
-          
-          {/* Bottom Indicators */}
-          <div className="mt-auto pt-24 grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in delay-500 opacity-0-init">
-            <div className="border-t border-white/10 pt-4">
-              <div className="text-[10px] font-mono text-brand mb-2">01 / OBSERVE</div>
-              <div className="text-sm text-white/70">Live application telemetry</div>
-            </div>
-            <div className="border-t border-white/10 pt-4">
-              <div className="text-[10px] font-mono text-brand mb-2">02 / REASON</div>
-              <div className="text-sm text-white/70">Competing hypotheses + adversarial critique</div>
-            </div>
-            <div className="border-t border-white/10 pt-4">
-              <div className="text-[10px] font-mono text-brand mb-2">03 / PROVE</div>
-              <div className="text-sm text-white/70">Controlled experiments + deterministic verification</div>
-            </div>
-          </div>
-
         </div>
 
-        {/* Right Column - Visual Abstract */}
-        <div className="flex-1 relative hidden lg:flex items-center justify-center opacity-0 animate-fade-in delay-500 opacity-0-init">
-          <div className="absolute inset-0 flex items-center justify-center">
-            
-            {/* The Graph */}
-            <div className="relative w-full max-w-[500px] aspect-square">
-              
-              {/* Edges */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 500">
-                <defs>
-                  <linearGradient id="edge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.05)" />
-                    <stop offset="50%" stopColor="rgba(232,169,21,0.2)" />
-                    <stop offset="100%" stopColor="rgba(255,255,255,0.05)" />
-                  </linearGradient>
-                  
-                  {/* Glowing dot moving along path */}
-                  <filter id="glow">
-                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-                
-                <path id="path1" d="M 100,150 C 200,150 250,250 350,250" fill="none" stroke="url(#edge-grad)" strokeWidth="1.5" />
-                <path id="path2" d="M 100,350 C 200,350 250,250 350,250" fill="none" stroke="url(#edge-grad)" strokeWidth="1.5" />
-                <path id="path3" d="M 350,250 C 400,250 420,150 450,150" fill="none" stroke="url(#edge-grad)" strokeWidth="1.5" />
-                
-                {/* Animated Pulses */}
-                <circle r="3" fill="#e8a915" filter="url(#glow)">
-                  <animateMotion dur="4s" repeatCount="indefinite" path="M 100,150 C 200,150 250,250 350,250" />
-                  <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="4s" repeatCount="indefinite" />
-                </circle>
-                
-                <circle r="3" fill="#e8a915" filter="url(#glow)">
-                  <animateMotion dur="5s" repeatCount="indefinite" path="M 100,350 C 200,350 250,250 350,250" begin="2s" />
-                  <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="5s" repeatCount="indefinite" begin="2s" />
-                </circle>
-
-                <circle r="3" fill="#a3be8c" filter="url(#glow)">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M 350,250 C 400,250 420,150 450,150" begin="1s" />
-                  <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="3s" repeatCount="indefinite" begin="1s" />
-                </circle>
-              </svg>
-
-              {/* Nodes */}
-              {/* Observe */}
-              <div className="absolute top-[130px] left-[60px] flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-brand/20 blur-md rounded-full animate-pulse" />
-                  <div className="w-10 h-10 bg-[#121620] border border-white/10 rounded-xl flex items-center justify-center relative z-10 shadow-lg shadow-black/50">
-                    <Activity className="w-4 h-4 text-white/50" />
-                  </div>
-                  <div className="absolute top-12 left-1/2 -translate-x-1/2 font-mono text-[9px] uppercase tracking-widest text-white/40">Observe</div>
-                </div>
-              </div>
-
-              {/* Critic */}
-              <div className="absolute top-[330px] left-[60px] flex items-center justify-center">
-                <div className="relative">
-                  <div className="w-10 h-10 bg-[#121620] border border-white/10 rounded-xl flex items-center justify-center relative z-10 shadow-lg shadow-black/50">
-                    <ShieldAlert className="w-4 h-4 text-white/30" />
-                  </div>
-                  <div className="absolute top-12 left-1/2 -translate-x-1/2 font-mono text-[9px] uppercase tracking-widest text-white/40">Critique</div>
-                </div>
-              </div>
-
-              {/* Hypothesize */}
-              <div className="absolute top-[230px] left-[330px] flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-brand/10 blur-sm rounded-full" />
-                  <div className="w-10 h-10 bg-[#121620] border border-brand/30 rounded-xl flex items-center justify-center relative z-10 shadow-[0_0_20px_rgba(232,169,21,0.15)]">
-                    <Beaker className="w-4 h-4 text-brand" />
-                  </div>
-                  <div className="absolute top-12 left-1/2 -translate-x-1/2 font-mono text-[9px] uppercase tracking-widest text-brand/80">Experiment</div>
-                </div>
-              </div>
-
-              {/* Verify */}
-              <div className="absolute top-[130px] left-[430px] flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-[#a3be8c]/20 blur-md rounded-full" />
-                  <div className="w-10 h-10 bg-[#121620] border border-[#a3be8c]/40 rounded-xl flex items-center justify-center relative z-10 shadow-[0_0_20px_rgba(163,190,140,0.1)]">
-                    <CheckCircle2 className="w-4 h-4 text-[#a3be8c]" />
-                  </div>
-                  <div className="absolute top-12 left-1/2 -translate-x-1/2 font-mono text-[9px] uppercase tracking-widest text-[#a3be8c]/80">Verify</div>
-                </div>
-              </div>
-
+        {/* Right Side */}
+        <div className="flex-1 w-full max-w-md mt-24 md:mt-0 flex flex-col items-start md:items-end text-left md:text-right">
+          <div className="mb-6 flex justify-end w-full">
+            {/* Decorative Icon matching reference */}
+            <div className="flex items-center">
+              <div className="w-0 h-0 border-t-[12px] border-b-[12px] border-l-[20px] border-transparent border-l-[#3b82f6] opacity-80"></div>
+              <div className="w-12 h-12 rounded-full border-2 border-[#a855f7] ml-2 opacity-80"></div>
             </div>
           </div>
+          
+          <h2 className="text-4xl lg:text-5xl font-medium mb-6 tracking-tight w-full">
+            Landing page.
+          </h2>
+          
+          <p className="text-white/60 text-sm leading-relaxed max-w-sm w-full font-light">
+            IncidentForge is an AI-native incident investigation and remediation platform. 
+            Observe telemetry, hypothesize root causes, challenge with adversarial critique, 
+            run controlled experiments, and verify fixes deterministically.
+          </p>
         </div>
       </main>
+
+      {/* Bottom decorative element */}
+      <div className="relative z-10 w-full flex justify-center pb-8">
+        <div className="w-4 h-8 rounded-full border border-white/30 flex items-start justify-center p-1">
+          <div className="w-1 h-2 bg-[#3b82f6] rounded-full animate-bounce"></div>
+        </div>
+      </div>
     </div>
   );
 }
