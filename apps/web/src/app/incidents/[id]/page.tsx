@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { Activity, Beaker, ChevronDown, ChevronUp, Database, FileSearch, GitBranch, Network, ShieldCheck, Server, AlertTriangle, ArrowRight, CheckCircle2, XCircle, FlaskConical, Play, Target } from "lucide-react";
-import { ReactFlow, Background, Controls, Node, Edge } from "@xyflow/react";
+import { ReactFlow, Background, Controls, Node, Edge, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import { api } from "@/lib/api";
@@ -108,9 +108,11 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
     ];
   }
 
-  const evidenceToShow = evidenceExpanded ? incident.evidence : incident.evidence.slice(0, 4);
+  const evidenceList = incident.evidence || [];
+  const evidenceToShow = evidenceExpanded ? evidenceList : evidenceList.slice(0, 4);
   const healthStatusStr = parsedLive?.['Status']?.replace('HealthStatus.', '');
   const isHealthy = isLiveMode && healthStatusStr === "HEALTHY";
+  const timelineEvents = incident.timeline || [];
 
   return (
     <main className="p-8 max-w-[1600px] mx-auto min-h-screen">
@@ -328,10 +330,7 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
                       nodesFocusable={false}
                       edgesFocusable={false}
                       edgesReconnectable={false}
-                    >
-                      <Background color="#2a3241" gap={16} size={1} />
-                      <Controls showInteractive={false} className="opacity-50" />
-                    </ReactFlow>
+                    />
                   </div>
                 </Card>
                 <Card className="p-4 bg-background/50">
@@ -457,12 +456,12 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
                 ))
               )}
             </div>
-            {!isLiveMode && incident.evidence.length > 4 && (
+            {!isLiveMode && evidenceList.length > 4 && (
               <button 
                 onClick={() => setEvidenceExpanded(!evidenceExpanded)} 
                 className="mt-2 w-full rounded border border-surface-elevated py-1.5 text-[11px] font-medium text-text-secondary hover:bg-surface-elevated/50 hover:text-white transition-colors"
               >
-                {evidenceExpanded ? "Show less" : `+ ${incident.evidence.length - 4} more`}
+                {evidenceExpanded ? "Show less" : `+ ${evidenceList.length - 4} more`}
               </button>
             )}
           </section>
@@ -471,12 +470,12 @@ export default function IncidentCommandCenter({ params }: { params: { id: string
             <SectionHeader title="Activity Stream" icon={Database} />
             <Card className="p-4 bg-background/50">
               <div className="space-y-4">
-                {incident.timeline.length === 0 ? (
+                {timelineEvents.length === 0 ? (
                   <span className="text-[12px] text-text-secondary font-mono">No activity recorded.</span>
                 ) : (
-                  incident.timeline.map((event, idx) => (
+                  timelineEvents.map((event, idx) => (
                     <div key={event.id} className="relative flex gap-4 text-[12px]">
-                      {idx !== incident.timeline.length - 1 && (
+                      {idx !== timelineEvents.length - 1 && (
                         <div className="absolute top-4 bottom-[-16px] left-[3px] w-[1px] bg-surface-elevated" />
                       )}
                       <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand relative z-10 ring-2 ring-background" />
