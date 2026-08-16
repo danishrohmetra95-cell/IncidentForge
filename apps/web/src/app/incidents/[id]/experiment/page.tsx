@@ -139,33 +139,35 @@ export default function ExperimentLab({ params }: { params: { id: string } }) {
                 </Card>
 
                 {/* 2-Column Reasoning Graph & Summary */}
-                <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-                  <Card className="h-[260px] overflow-hidden p-0 relative border-surface-elevated">
+                <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr] items-stretch">
+                  <Card className="h-full min-h-[320px] overflow-hidden p-0 relative border-surface-elevated flex flex-col">
                     <div className="absolute top-3 left-3 z-10 font-mono text-[9px] uppercase tracking-wider text-text-secondary bg-background/80 px-2 py-1 rounded">Reasoning Graph</div>
-                    <ReactFlow nodes={flowNodes} edges={flowEdges} fitView attributionPosition="bottom-left">
-                      <Background color="#2a3241" gap={16} size={1} />
-                      <Controls showInteractive={false} className="opacity-50" />
-                    </ReactFlow>
+                    <div className="flex-1 w-full h-full relative">
+                      <ReactFlow nodes={flowNodes} edges={flowEdges} fitView attributionPosition="bottom-right">
+                        <Background color="#2a3241" gap={16} size={1} />
+                        <Controls showInteractive={false} className="opacity-50" />
+                      </ReactFlow>
+                    </div>
                   </Card>
                   
-                  <Card className="p-4 bg-background/50 border-surface-elevated flex flex-col">
+                  <Card className="h-full min-h-[320px] p-5 bg-background/50 border-surface-elevated flex flex-col">
                     <SectionHeader title="Experiment Summary" icon={FileText} />
-                    <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+                    <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2">
                       <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-1 block">Hypothesis</span>
-                        <p className="text-[12px] font-medium text-text-primary leading-snug">{target?.statement}</p>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-1.5 block">Hypothesis</span>
+                        <p className="text-[13px] font-medium text-text-primary leading-snug bg-surface/30 p-2.5 rounded border border-surface-elevated">{target?.statement}</p>
                       </div>
                       <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-1 block">Falsification Check</span>
-                        <p className="text-[12px] text-text-primary leading-snug">{critique?.falsification_criteria[0] || "No criteria available"}</p>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-text-secondary mb-1.5 block">Falsification Check</span>
+                        <p className="text-[12px] text-text-primary leading-snug bg-surface/30 p-2.5 rounded border border-surface-elevated border-l-status-amber/50">{critique?.falsification_criteria[0] || "No criteria available"}</p>
                       </div>
                       <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-brand mb-1 block">Expected Conditions</span>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-brand mb-1.5 block">Expected Conditions</span>
                         <div className="space-y-1.5">
                           {experiment.expected_conditions.map(cond => (
-                            <div key={cond.metric} className="flex justify-between items-center text-[11px] font-mono bg-surface px-2 py-1.5 rounded border border-surface-elevated">
+                            <div key={cond.metric} className="flex justify-between items-center text-[11px] font-mono bg-surface/50 px-2.5 py-1.5 rounded border border-surface-elevated">
                               <span className="text-text-secondary">{cond.metric}</span>
-                              <span className="text-white">{cond.direction} {cond.threshold_percentage}%</span>
+                              <span className="text-white bg-surface-elevated/40 px-1.5 py-0.5 rounded">{cond.direction} {cond.threshold_percentage}%</span>
                             </div>
                           ))}
                         </div>
